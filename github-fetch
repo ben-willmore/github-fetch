@@ -62,7 +62,7 @@ raise_api_error () {
     echo Github API rate limit reached:
     echo $api_limit
   else
-    echo API URL: $api/$2
+    echo API URL: $2
     if [[ $n_api_calls == 0 ]]; then
       echo You probably provided an invalid or unsupported URL
     else
@@ -296,11 +296,14 @@ dest_dir="$(pwd)"
 
 if [[ $type == tree ]]; then
   # directory
+  if [[ ! -z $ref ]]; then
+    refstr="?ref=$ref"
+  fi
   if [[ -z $root ]]; then
-    get_dir $apiurl/repos/$user/$repo/contents?ref=$ref $repo
+    get_dir $apiurl/repos/$user/$repo/contents$refstr $repo
   else
     base=$(basename $root)
-    get_dir $apiurl/repos/$user/$repo/contents/$root?ref=$ref $(urldecode $base)
+    get_dir $apiurl/repos/$user/$repo/contents/$root$refstr $(urldecode $base)
   fi
 
 elif [[ $type == blob ]]; then
