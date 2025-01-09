@@ -1,52 +1,21 @@
 #!/bin/bash
 
-if [[ $1 == '-h' ]] || [[ $1 == '--help' ]]; then
-  echo
-  echo Fetch a directory from Github
-  echo
-  echo Syntax: github-dir \<url\> [\<dest_dir\>] where \<url\> is of the form:
-  echo https://github.com/ben-willmore/portmaster/tree/main/perfectdark
-  echo https://github.com/ben-willmore/portmaster/tree/50c7502bc0b04f61dd94939735302c8d8fc18c4d/perfectdark
-  echo and can be pasted from a browser page that shows a directory
-  echo
-  echo If \<dest_dir\> is supplied, the fetched directory will be put there\;
-  echo otherwise it will be put in the current directory.
-  echo
-  echo This should work on any unix system with basic tools installed
-  echo \(bash, sed, grep, ...\), including jq and either curl or wget. 
-  exit 0
-fi
-
-if [[ ! -z `which curl` ]]; then
-  USE_CURL=true
-elif [[ -z `which wget` ]]; then
-  echo Neither curl nor wget is available
-fi
-
-# parse URL
-# e.g. https://github.com/ben-willmore/portmaster/tree/main/perfectdark
-
-proto="$(echo $1 | grep :// | sed -e's,^\(.*://\).*,\1,g')"
-url="$(echo ${1/$proto/})"
-
-host="$(echo $url | cut -d/ -f1)"
-url="$(echo ${url/$host\//})"
-
-user="$(echo $url | cut -d/ -f1)"
-url="$(echo ${url/$user\//})"
-
-repo="$(echo $url | cut -d/ -f1)"
-url="$(echo ${url/$repo\//})"
-
-tree="$(echo $url | cut -d/ -f1)"
-url="$(echo ${url/$tree\//})"
-
-ref="$(echo $url | cut -d/ -f1)"
-rootdir="$(echo ${url/$ref\//})"
+## functions
 
 api=https://api.github.com
 
-n_api_calls=0
+github_api () {
+  if [[ $USE_CURL == true ]]; then
+    res=$(curl $api/$1 2>/dev/null)
+  else
+    res=$(wget -qO- $api/$1)
+  fi
+
+  if [[ $? != 0 ]]; then
+    raise_api_error "API call failed" $1 >&2
+  fi
+  echo $res
+}
 
 get_rate_limit() {
   res=$(github_api rate_limit)
@@ -62,20 +31,6 @@ get_rate_limit() {
   else
     echo $remaining calls remaining \(of $limit\)\; reset at $reset_str
   fi
-}
-
-github_api () {
-  if [[ $USE_CURL == true ]]; then
-    res=$(curl $api/$1 2>/dev/null)
-  else
-    res=$(wget -qO- $api/$1)
-  fi
-
-  if [[ $? != 0 ]]; then
-    raise_api_error "API call failed" $1 >&2
-  fi
-  n_api_calls=$((n_api_calls+1))
-  echo $res
 }
 
 raise_api_error () {
@@ -113,22 +68,32 @@ get_file () {
 }
 
 get_dir () {
-  if [[ -z $s ]]; then
+  if [[ -z $2 ]]; then
     dirname=$(basename $1)
   else
     dirname=$2
   fi
+  echo $dirname
 
+  if [[ -e $dirname ]]; then
+    echo Error: $(pwd)/$dirname already exists\; can\'t create directory
+    echo
+    exit 0
+  fi
   mkdir $dirname
   cd $dirname
 
-  url=repos/$user/$repo/$1?ref=$ref
+  url=repos/$user/$repo/$1
+  if [[ ! -z $ref ]]; then
+    url=$url?ref=$ref
+  fi
   
   if [[ $n_api_calls == 0 ]]; then
     echo Base API URL: $url
     echo
   fi
   res=$(github_api $url)
+  n_api_calls=$((n_api_calls+1))
 
   file_urls=$(echo $res | jq -r '.[] | select(.type=="file") | .download_url' 2>/dev/null)
   if [[ $? != 0 ]]; then
@@ -148,6 +113,73 @@ get_dir () {
   cd ..
 }
 
+## main program
+
+if [[ $1 == '-h' ]] || [[ $1 == '--help' ]]; then
+  echo
+  echo Fetch a directory from Github
+  echo
+  echo Syntax: github-dir \<url\> [\<dest_dir\>] where \<url\> is of the form:
+  echo https://github.com/ben-willmore/portmaster/tree/main/perfectdark
+  echo https://github.com/ben-willmore/portmaster/tree/50c7502bc0b04f61dd94939735302c8d8fc18c4d/perfectdark
+  echo and can be pasted from a browser page that shows a directory
+  echo
+  echo If \<dest_dir\> is supplied, the fetched directory will be put there\;
+  echo otherwise it will be put in the current directory.
+  echo
+  echo This should work on any unix system with basic tools installed
+  echo \(bash, sed, grep, ...\), including jq and either curl or wget. 
+  exit 0
+fi
+
+if [[ $1 == '-l' ]] || [[ $1 == '--limit' ]]; then
+  echo Github rate limit status:
+  echo $(get_rate_limit)
+  exit 0
+fi
+
+if [[ ! -z `which curl` ]]; then
+  USE_CURL=true
+elif [[ -z `which wget` ]]; then
+  echo Neither curl nor wget is available
+fi
+
+# parse URL
+# e.g. https://github.com/ben-willmore/portmaster/tree/main/perfectdark
+
+proto="$(echo $1 | grep :// | sed -e's,^\(.*://\).*,\1,g')"
+url="$(echo ${1/$proto/})"
+
+host="$(echo $url | cut -d/ -f1)"
+url="$(echo ${url/$host\//})"
+
+user="$(echo $url | cut -d/ -f1)"
+url="$(echo ${url/$user\//})"
+
+repo="$(echo $url | cut -d/ -f1)"
+url="$(echo ${url/$repo\//})"
+
+if [[ $url == $repo ]]; then
+  # got whole URL already, use default branch and get whole repo
+  ref=
+  rootdir=
+  echo Fetching $user:$repo \(whole repo, default branch\)
+else
+  url="$(echo ${url/tree\//})"
+  ref="$(echo $url | cut -d/ -f1)"
+
+  if [[ $url == $ref ]]; then
+    # got whole URL already, get whole repo
+    rootdir=
+    echo Fetching $user:$repo@$ref \(whole repo\)
+  else
+    rootdir="$(echo ${url/$ref\//})"
+    echo Fetching $user:$repo/$rootdir@$ref
+  fi
+fi
+
+n_api_calls=0
+
 if [[ ! -z $2 ]]; then
   cd $2
 fi
@@ -157,6 +189,9 @@ if [[ -z $rootdir ]]; then
 else
   get_dir contents/$rootdir
 fi
+
+echo
+echo Finished -- used $n_api_calls Github API calls
 
 # https://api.github.com/repos/ben-willmore/portmaster/contents/doutkutsu-rs?ref=main
 #for url in $(curl -s https://api.github.com/repos/$user/$repo/contents/$folder | jq -r '.[] | select(.type=="file") | .download_url'); do
