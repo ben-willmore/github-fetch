@@ -5,7 +5,7 @@
 apiurl=https://api.github.com
 
 github_api () {
-  if [[ $USE_CURL == true ]]; then
+  if [[ $use_curl == true ]]; then
     res=$(curl $apiurl/$1 2>/dev/null)
   else
     res=$(wget -qO- $apiurl/$1)
@@ -56,7 +56,7 @@ raise_api_error () {
 
 download_file () {
   echo Fetching URL: $1
-  if [[ $USE_CURL == true ]]; then
+  if [[ $use_curl == true ]]; then
     curl -O $1 2>/dev/null
   else
     wget $1
@@ -115,6 +115,8 @@ get_dir () {
 }
 
 get_file () {
+  url=https://raw.githubusercontent.com/$user/$repo/$ref/$1
+
   filename=$(basename $1)
   echo $filename
 
@@ -124,35 +126,8 @@ get_file () {
     exit 3
   fi
 
-  url=repos/$user/$repo/$1
-  if [[ ! -z $ref ]]; then
-    url=$url?ref=$ref
-  fi
-  
-  if [[ $n_api_calls == 0 ]]; then
-    echo Base API URL: $url
-    echo
-  fi
-  res=$(github_api $url)
-  n_api_calls=$((n_api_calls+1))
-
-  echo $res
-  # file_urls=$(echo $res | jq -r '.[] | select(.type=="file") | .download_url' 2>/dev/null)
-  # if [[ $? != 0 ]]; then
-  #   raise_api_error "Could not parse API response" $url
-  # fi
-
-  # for url in $file_urls; do
-  #   echo Fetching $1/$(basename $url)
-  #   download_file $url
-  # done
-
-  # dirs=$(echo $res | jq -r '.[] | select(.type=="dir") | .name')
-  # for dir in $dirs; do
-  #   get_dir $1/$dir
-  # done
-
-  # cd ..
+  echo Fetching $1
+  download_file $url
 }
 
 ## main program
@@ -178,26 +153,66 @@ if [[ $1 == '-h' ]] || [[ $1 == '--help' ]]; then
   exit 0
 fi
 
-if [[ $1 == '-l' ]] || [[ $1 == '--limit' ]]; then
-  echo Github rate limit status:
-  echo $(get_rate_limit)
-  exit 0
+args=
+for arg in "$@"; do
+  if [[ ${arg:0:2} == "--" ]] ; then
+    args+=" $arg"
+  elif [[ ${arg:0:1} == "-" ]] ; then
+    for (( i=0; i<${#arg}; i++ )); do
+      case ${arg:$i:1} in
+        l)
+          args+=" --limit"
+          ;;
+        p)
+          args+=" --parse-only"
+          ;;
+        c)
+          args+=" --curl"
+          ;;
+        w)
+          args+=" --wget"
+          ;;
+      esac
+    done
+  else
+    input_url=$arg
+  fi
+done
+
+use_curl=true
+for arg in $args; do
+  case $arg in
+    --*limit*)
+      echo Github rate limit status:
+      echo $(get_rate_limit)
+      exit 0
+      ;;
+    --*parse*)
+      parse_only=true
+      ;;
+    --*wget*)
+      use_curl=false
+      ;;
+  esac
+done
+
+if [[ -z $input_url ]]; then
+  echo Error: No URL was supplied
+  echo
+  exit 7
 fi
 
-if [[ $1 == '-p' ]] || [[ $1 == '--parse' ]]; then
-  parse_only=true
-  input_url=$2
-else
-  parse_only=false
-  input_url=$1
-fi
+which_curl=$(which curl)
+which_wget=$(which wget)
 
-if [[ ! -z `which curl` ]]; then
-  USE_CURL=true
-elif [[ -z `which wget` ]]; then
+if [[ -z $which_curl ]] && [[ -z $which_wget ]]; then
   echo Error: Neither curl nor wget is available
   echo
-  exit 1
+  exit 8
+elif [[ $use_curl == true ]] && [[ -z $which_curl ]]; then
+  use_curl=false
+elif [[ $use_curl == false ]] && [[ -z $which_curl ]]; then
+  use_curl=true
 fi
 
 # parse URL
@@ -263,7 +278,7 @@ if [[ $type == tree ]]; then
 
 elif [[ $type == blob ]]; then
   # file
-  get_file contents/$root
+  get_file $root
 
 fi
 
