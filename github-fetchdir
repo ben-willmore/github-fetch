@@ -1,0 +1,118 @@
+#!/bin/bash
+
+if [[ $1 == '-h' ]] || [[ $1 == '--help' ]]; then
+  echo
+  echo Fetch a directory from Github
+  echo
+  echo Syntax: github-dir \<url\> where \<url\> is of the form:
+  echo https://github.com/ben-willmore/portmaster/tree/main/perfectdark
+  echo https://github.com/ben-willmore/portmaster/tree/50c7502bc0b04f61dd94939735302c8d8fc18c4d/perfectdark
+  echo and can be pasted from a browser page that shows a directory
+  echo
+  echo You need to have either curl or wget installed, but there are no
+  echo other dependencies.
+  exit 0
+fi
+
+if [[ ! -z `which curl` ]]; then
+  USE_CURL=true
+elif [[ -z `which wget` ]]; then
+  echo Neither curl nor wget is available
+fi
+
+# parse URL
+# e.g. https://github.com/ben-willmore/portmaster/tree/main/perfectdark
+
+proto="$(echo $1 | grep :// | sed -e's,^\(.*://\).*,\1,g')"
+url="$(echo ${1/$proto/})"
+
+host="$(echo $url | cut -d/ -f1)"
+url="$(echo ${url/$host\//})"
+
+user="$(echo $url | cut -d/ -f1)"
+url="$(echo ${url/$user\//})"
+
+repo="$(echo $url | cut -d/ -f1)"
+url="$(echo ${url/$repo\//})"
+
+tree="$(echo $url | cut -d/ -f1)"
+url="$(echo ${url/$tree\//})"
+
+ref="$(echo $url | cut -d/ -f1)"
+rootfolder="$(echo ${url/$ref\//})"
+
+api=https://api.github.com/repos
+
+n_api_calls=0
+
+raise_api_error () {
+  echo
+  echo Error: $1
+  if [[ $n_api_calls == 0 ]]; then
+    echo You probably provided an invalid or unsupported URL
+    echo \(or hit the github rate limit of ~60 per hour\)
+  else
+    echo You probably hit the github rate limit of ~60 per hour
+  fi
+  echo
+  echo The URL was:
+  echo $2
+  echo
+  exit 0
+}
+
+get_folder () {
+  echo $1 `basename $1`
+  folder=`basename $1`
+  mkdir $folder
+  cd $folder
+  url=$api/$user/$repo/$1?ref=$ref
+  echo $url
+  if [[ $USE_CURL == true ]]; then
+    res=$(curl $url)
+  else
+    res=$(wget -qO- $url)
+  fi
+
+  if [[ $? != 0 ]]; then
+    raise_api_error "API call failed" $url
+  fi
+  n_api_calls=$((n_api_calls+1))
+
+  file_urls=$(echo $res | jq -r '.[] | select(.type=="file") | .download_url')
+  if [[ $? != 0 ]]; then
+    raise_api_error "Could not parse API response" $url
+  fi
+
+  for url in $file_urls; do
+    if [[ $USE_CURL == true ]]; then
+      curl -O $url
+    else
+      wget $url
+    fi
+    if [[ $? != 0 ]]; then
+      echo File download failed for URL:
+      echo $url
+      exit 0
+    fi
+  done
+
+  dirs=$(echo $res | jq -r '.[] | select(.type=="dir") | .name')
+  for dir in $dirs; do
+    get_folder $1/$dir
+  done
+  cd ..
+}
+
+dest_name=`basename $rootfolder`
+if [[ -e $dest_name ]]; then
+  echo Error: $dest_name already exists in current folder
+  echo
+  exit 0
+fi
+get_folder contents/$rootfolder
+
+# https://api.github.com/repos/ben-willmore/portmaster/contents/doutkutsu-rs?ref=main
+#for url in $(curl -s https://api.github.com/repos/$user/$repo/contents/$folder | jq -r '.[] | select(.type=="file") | .download_url'); do
+#  wget $url
+#done
