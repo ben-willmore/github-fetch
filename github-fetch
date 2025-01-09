@@ -146,7 +146,7 @@ if [[ $1 == '-h' ]] || [[ $1 == '--help' ]]; then
   echo https://github.com/ben-willmore/github-fetch/blob/main/README.md
   echo  \(single file, main branch\)
   echo
-  echo You can get the URL by navigating to the relevant file/directory\'s paage on github and then
+  echo You can get the URL by navigating to the relevant file/directory\'s page on github and then
   echo copy-pasting from the URL bar.
   echo
   echo If \<dest_dir\> is supplied, the fetched directory will be put there\;
