@@ -113,7 +113,12 @@ get_file () {
 }
 
 get_dir () {
-  dirname=$(basename $1)
+  if [[ -z $s ]]; then
+    dirname=$(basename $1)
+  else
+    dirname=$2
+  fi
+
   mkdir $dirname
   cd $dirname
 
@@ -147,7 +152,11 @@ if [[ ! -z $2 ]]; then
   cd $2
 fi
 
-get_dir contents/$rootdir
+if [[ -z $rootdir ]]; then
+  get_dir contents $repo
+else
+  get_dir contents/$rootdir
+fi
 
 # https://api.github.com/repos/ben-willmore/portmaster/contents/doutkutsu-rs?ref=main
 #for url in $(curl -s https://api.github.com/repos/$user/$repo/contents/$folder | jq -r '.[] | select(.type=="file") | .download_url'); do
