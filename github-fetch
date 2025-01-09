@@ -134,16 +134,20 @@ get_file () {
 
 if [[ $1 == '-h' ]] || [[ $1 == '--help' ]]; then
   echo
-  echo Fetch a directory from Github
+  echo Fetch a file or directory from Github
   echo
-  echo Syntax: github-fetchdir \<url\> [\<dest_dir\>] where \<url\> is of the form:
-  echo https://github.com/ben-willmore/github-fetchdir
+  echo Syntax: github-fetch \<url\> [\<dest_dir\>] where \<url\> is of the form:
+  echo https://github.com/ben-willmore/github-fetch
   echo  \(whole repo, default branch\)
-  echo https://github.com/ben-willmore/github-fetchdir/tree/testbranch/test
+  echo https://github.com/ben-willmore/github-fetch/tree/testbranch/test
   echo  \(subdirectory, branch testbranch\)
-  echo https://github.com/ben-willmore/github-fetchdir/tree/aa25db658a2013f8a0004cbdbff3ff59ce3e0aaa/test
+  echo https://github.com/ben-willmore/github-fetch/tree/aa25db658a2013f8a0004cbdbff3ff59ce3e0aaa/test
   echo  \(subdirectory, specific commit\)
-  echo The URL can be pasted from a browser page that shows a directory.
+  echo https://github.com/ben-willmore/github-fetch/blob/main/README.md
+  echo  \(single file, main branch\)
+  echo
+  echo You can get the URL by navigating to the relevant file/directory\'s paage on github and then
+  echo copy-pasting from the URL bar.
   echo
   echo If \<dest_dir\> is supplied, the fetched directory will be put there\;
   echo otherwise it will be put in the current directory.
@@ -288,8 +292,3 @@ fi
 
 echo
 echo Finished -- used $n_api_calls Github API calls
-
-# https://api.github.com/repos/ben-willmore/portmaster/contents/doutkutsu-rs?ref=main
-#for url in $(curl -s https://api.github.com/repos/$user/$repo/contents/$folder | jq -r '.[] | select(.type=="file") | .download_url'); do
-#  wget $url
-#done
