@@ -1,6 +1,6 @@
 ## github-fetch: Fetch a file or directory from Github with minimal dependencies
   
-Syntax: `github-fetch <url> [<dest_dir>]`, where <url> is of the form:
+Syntax: `github-fetch <url> [<dest_dir>]`, where `<url>` is of the form:
 
 `https://github.com/ben-willmore/github-fetch` (whole repo, default branch)
 
@@ -12,7 +12,7 @@ Syntax: `github-fetch <url> [<dest_dir>]`, where <url> is of the form:
 
 You can get the URL by navigating to the relevant file/directory\'s page on github and then copy-pasting from the URL bar.  
 
-If <dest_dir> is supplied, the fetched content will be put there; otherwise it will be put in the current directory.
+If `<dest_dir>` is supplied, the fetched content will be put there; otherwise it will be put in the current directory.
 
 This should work on any unix system with basic tools installed (bash, sed, grep, ...), including jq and either curl or wget.
 
