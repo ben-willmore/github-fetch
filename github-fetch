@@ -74,30 +74,35 @@ raise_api_error () {
 }
 
 download_file () {
-  echo Fetching URL: $1
+  # echo Fetching URL: $1
   if [[ $use_curl == true ]]; then
-    curl -sS -o "${2}" $1 2>/dev/null
+    curl -sS -o "./${2}" "${1}"
   else
-    wget -nv -O "${2}" $1
+    wget -nv -O "./${2}" "${1}"
   fi
   if [[ $? != 0 ]]; then
     echo File download failed for URL:
-    echo $1
+    echo "${1}"
     exit 4
   fi
 }
 
 get_dir () {
   pd="$(pwd)"
-  pwd_short="${pd#$dest_dir/}"
-  echo --- $pd $dest_dir $pwd_short
-  echo ----- "${2}"
+  pwd_short="${pd#$dest_dir}"
+  # echo --- $pd $dest_dir $pwd_short
+  # echo ----- "${2}"
+  if [[ -z $pwd_short ]]; then
+    dir_short="${2}"
+  else
+    dir_short="${pwd_short}/${2}"
+  fi
   if [[ -e "${2}" ]]; then
-    echo Error: "${pwd_short}/${2} already exists\; can\'t create directory"
+    echo Error: "${dir_short} already exists\; can\'t create directory"
     echo
     exit 5
   fi
-  echo "Making directory \"${pwd_short}/${2}\""
+  echo "Making directory \"${dir_short}/\""
   mkdir "${2}"
   cd "${2}"
   
@@ -115,7 +120,7 @@ get_dir () {
   fi
   for url in $file_urls; do
     filename=$(echo $res | jq -r '.[] | select(.download_url==$ENV.url) | .name')
-    echo Fetching $1/$(basename $url) to \"${pwd_short}/${2}/${filename}\"
+    echo Fetching $url to \"${dir_short}/${filename}\"
     download_file $url "${filename}"
   done
 
