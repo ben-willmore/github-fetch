@@ -1,4 +1,4 @@
-## github-fetch: Fetch a file or directory from Github with minimal dependencies
+## github-fetch: Fetch a file or directory from Github by pasting its URL into the command line
   
 Syntax: `github-fetch <url> [<dest_dir>]`, where `<url>` is of the form:
 
