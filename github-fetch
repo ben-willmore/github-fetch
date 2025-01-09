@@ -175,7 +175,11 @@ for arg in "$@"; do
       esac
     done
   else
-    input_url=$arg
+    if [[ -z $input_url ]]; then
+      input_url=$arg
+    else
+      dest_dir=$arg
+    fi
   fi
 done
 
@@ -264,12 +268,12 @@ fi
 
 n_api_calls=0
 
+if [[ ! -z $dest_dir ]]; then
+  cd $dest_dir
+fi
+
 if [[ $type == tree ]]; then
   # directory
-  if [[ ! -z $2 ]]; then
-    cd $2
-  fi
-
   if [[ -z $root ]]; then
     get_dir contents $repo
   else
