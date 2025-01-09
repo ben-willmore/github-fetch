@@ -136,17 +136,14 @@ get_dir () {
 get_file () {
   url=https://raw.githubusercontent.com/$user/$repo/$ref/$1
 
-  filename=$(basename $1)
-  echo $filename
-
-  if [[ -e $filename ]]; then
-    echo Error: $(pwd)/$filename already exists\; can\'t create file
+  if [[ -e "${2}" ]]; then
+    echo Error: $filename already exists\; can\'t create file
     echo
     exit 3
   fi
 
-  echo Fetching $1
-  download_file $url
+  echo Fetching $url to "${2}"
+  download_file $url "${2}"
 }
 
 ## main program
@@ -308,7 +305,8 @@ if [[ $type == tree ]]; then
 
 elif [[ $type == blob ]]; then
   # file
-  get_file $root
+  base=$(basename $root)
+  get_file $root $(urldecode $base)
 
 fi
 
