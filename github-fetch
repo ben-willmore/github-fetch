@@ -4,11 +4,30 @@
 
 apiurl=https://api.github.com
 
+LANG=C
+
+urlencode() {
+    local l=${#1}
+    for (( i = 0 ; i < l ; i++ )); do
+        local c=${1:i:1}
+        case "$c" in
+            [a-zA-Z0-9.~_-]) printf "$c" ;;
+            ' ') printf + ;;
+            *) printf '%%%.2X' "'$c"
+        esac
+    done
+}
+
+urldecode() {
+    local data=${1//+/ }
+    printf '%b' "${data//%/\x}"
+}
+
 github_api () {
   if [[ $use_curl == true ]]; then
-    res=$(curl -sS $apiurl/$1)
+    res=$(curl -sS $1)
   else
-    res=$(wget -qO- $apiurl/$1)
+    res=$(wget -qO- $1)
   fi
 
   if [[ $? != 0 ]]; then
@@ -18,7 +37,7 @@ github_api () {
 }
 
 get_rate_limit() {
-  res=$(github_api rate_limit)
+  res=$(github_api $apiurl/rate_limit)
   limit=$(echo $res | jq ".rate.limit")
   remaining=$(echo $res | jq ".rate.remaining")
   reset_epoch=$(echo $res | jq ".rate.reset")
@@ -57,9 +76,9 @@ raise_api_error () {
 download_file () {
   echo Fetching URL: $1
   if [[ $use_curl == true ]]; then
-    curl -sS -O $1 2>/dev/null
+    curl -sS -o "${2}" $1 2>/dev/null
   else
-    wget -nv $1
+    wget -nv -O "${2}" $1
   fi
   if [[ $? != 0 ]]; then
     echo File download failed for URL:
@@ -69,46 +88,41 @@ download_file () {
 }
 
 get_dir () {
-  if [[ -z $2 ]]; then
-    dirname=$(basename $1)
-  else
-    dirname=$2
-  fi
-  echo $dirname
-
-  if [[ -e $dirname ]]; then
-    echo Error: $(pwd)/$dirname already exists\; can\'t create directory
+  pd="$(pwd)"
+  pwd_short="${pd#$dest_dir/}"
+  echo --- $pd $dest_dir $pwd_short
+  echo ----- "${2}"
+  if [[ -e "${2}" ]]; then
+    echo Error: "${pwd_short}/${2} already exists\; can\'t create directory"
     echo
     exit 5
   fi
-  mkdir $dirname
-  cd $dirname
-
-  url=repos/$user/$repo/$1
-  if [[ ! -z $ref ]]; then
-    url=$url?ref=$ref
-  fi
+  echo "Making directory \"${pwd_short}/${2}\""
+  mkdir "${2}"
+  cd "${2}"
   
   if [[ $n_api_calls == 0 ]]; then
-    echo Base API URL: $url
+    echo Base API URL: $1
     echo
   fi
-  res=$(github_api $url)
+
+  local res=$(github_api $1)
   n_api_calls=$((n_api_calls+1))
 
-  file_urls=$(echo $res | jq -r '.[] | select(.type=="file") | .download_url' 2>/dev/null)
+  file_urls=$(echo $res | jq -r '.[] | select(.type=="file") | .download_url' 2>/dev/null)  
   if [[ $? != 0 ]]; then
-    raise_api_error "Could not parse API response" $url
+    raise_api_error "Could not parse API response" $1
   fi
-
   for url in $file_urls; do
-    echo Fetching $1/$(basename $url)
-    download_file $url
+    filename=$(echo $res | jq -r '.[] | select(.download_url==$ENV.url) | .name')
+    echo Fetching $1/$(basename $url) to \"${pwd_short}/${2}/${filename}\"
+    download_file $url "${filename}"
   done
 
-  dirs=$(echo $res | jq -r '.[] | select(.type=="dir") | .name')
-  for dir in $dirs; do
-    get_dir $1/$dir
+  dir_urls=$(echo $res | jq -r '.[] | select(.type=="dir") | .url')
+  for url in $dir_urls; do
+    dirname=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .name')
+    get_dir $url "${dirname}"
   done
 
   cd ..
@@ -272,16 +286,19 @@ fi
 
 n_api_calls=0
 
-if [[ ! -z $dest_dir ]]; then
-  cd $dest_dir
+if [[ ! -z "${dest_dir}" ]]; then
+  cd "${dest_dir}"
 fi
+
+dest_dir="$(pwd)"
 
 if [[ $type == tree ]]; then
   # directory
   if [[ -z $root ]]; then
-    get_dir contents $repo
+    get_dir $apiurl/repos/$user/$repo/contents?ref=$ref $repo
   else
-    get_dir contents/$root
+    base=$(basename $root)
+    get_dir $apiurl/repos/$user/$repo/contents/$root?ref=$ref $(urldecode $base)
   fi
 
 elif [[ $type == blob ]]; then
