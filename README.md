@@ -1,6 +1,6 @@
 ## github-fetchdir: Fetch a directory from Github with minimal dependencies
   
-Syntax: `github-dir <url> [<dest_dir>]`, where <url> is of the form:
+Syntax: `github-fetchdir <url> [<dest_dir>]`, where <url> is of the form:
 
 `https://github.com/ben-willmore/portmaster/` (whole repo, default branch)
 
