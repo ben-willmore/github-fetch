@@ -4,13 +4,16 @@ if [[ $1 == '-h' ]] || [[ $1 == '--help' ]]; then
   echo
   echo Fetch a directory from Github
   echo
-  echo Syntax: github-dir \<url\> where \<url\> is of the form:
+  echo Syntax: github-dir \<url\> [\<dest_dir\>] where \<url\> is of the form:
   echo https://github.com/ben-willmore/portmaster/tree/main/perfectdark
   echo https://github.com/ben-willmore/portmaster/tree/50c7502bc0b04f61dd94939735302c8d8fc18c4d/perfectdark
   echo and can be pasted from a browser page that shows a directory
   echo
-  echo You need to have either curl or wget installed, but there are no
-  echo other dependencies.
+  echo If \<dest_dir\> is supplied, the fetched directory will be put there\;
+  echo otherwise it will be put in the current directory.
+  echo
+  echo This should work on any unix system with basic tools installed
+  echo \(bash, sed, grep, ...\), including jq and either curl or wget. 
   exit 0
 fi
 
@@ -39,78 +42,112 @@ tree="$(echo $url | cut -d/ -f1)"
 url="$(echo ${url/$tree\//})"
 
 ref="$(echo $url | cut -d/ -f1)"
-rootfolder="$(echo ${url/$ref\//})"
+rootdir="$(echo ${url/$ref\//})"
 
-api=https://api.github.com/repos
+api=https://api.github.com
 
 n_api_calls=0
 
-raise_api_error () {
-  echo
-  echo Error: $1
-  if [[ $n_api_calls == 0 ]]; then
-    echo You probably provided an invalid or unsupported URL
-    echo \(or hit the github rate limit of ~60 per hour\)
-  else
-    echo You probably hit the github rate limit of ~60 per hour
+get_rate_limit() {
+  res=$(github_api rate_limit)
+  limit=$(echo $res | jq ".rate.limit")
+  remaining=$(echo $res | jq ".rate.remaining")
+  reset_epoch=$(echo $res | jq ".rate.reset")
+  reset_str=$(date -d @$reset_epoch 2>/dev/null)
+  if [[ $? != 0 ]]; then
+    reset_str=$(date -j -f %s $reset_epoch 2>/dev/null)
   fi
+  if [[ -z $reset_str ]]; then
+    echo $remaining calls remaining \(of $limit\)
+  else
+    echo $remaining calls remaining \(of $limit\)\; reset at $reset_str
+  fi
+}
+
+github_api () {
+  if [[ $USE_CURL == true ]]; then
+    res=$(curl $api/$1 2>/dev/null)
+  else
+    res=$(wget -qO- $api/$1)
+  fi
+
+  if [[ $? != 0 ]]; then
+    raise_api_error "API call failed" $1 >&2
+  fi
+  n_api_calls=$((n_api_calls+1))
+  echo $res
+}
+
+raise_api_error () {
+  echo Error: $1
   echo
-  echo The URL was:
-  echo $2
+
+  api_limit=$(get_rate_limit)
+  n_remaining="$(echo $api_limit | cut -d" " -f1)"
+  if [[ n_remaining == 0 ]]; then
+    echo Github API rate limit reached:
+    echo $api_limit
+  else
+    echo API URL: $api/$2
+    if [[ $n_api_calls == 0 ]]; then
+      echo You probably provided an invalid or unsupported URL
+    else
+      echo Unknown failure
+    fi
+  fi
   echo
   exit 0
 }
 
-get_folder () {
-  echo $1 `basename $1`
-  folder=`basename $1`
-  mkdir $folder
-  cd $folder
-  url=$api/$user/$repo/$1?ref=$ref
-  echo $url
+get_file () {
   if [[ $USE_CURL == true ]]; then
-    res=$(curl $url)
+    curl -O $1 2>/dev/null
   else
-    res=$(wget -qO- $url)
+    wget $1
   fi
-
   if [[ $? != 0 ]]; then
-    raise_api_error "API call failed" $url
+    echo File download failed for URL:
+    echo $1
+    exit 0
   fi
-  n_api_calls=$((n_api_calls+1))
+}
 
-  file_urls=$(echo $res | jq -r '.[] | select(.type=="file") | .download_url')
+get_dir () {
+  dirname=$(basename $1)
+  mkdir $dirname
+  cd $dirname
+
+  url=repos/$user/$repo/$1?ref=$ref
+  
+  if [[ $n_api_calls == 0 ]]; then
+    echo Base API URL: $url
+    echo
+  fi
+  res=$(github_api $url)
+
+  file_urls=$(echo $res | jq -r '.[] | select(.type=="file") | .download_url' 2>/dev/null)
   if [[ $? != 0 ]]; then
     raise_api_error "Could not parse API response" $url
   fi
 
   for url in $file_urls; do
-    if [[ $USE_CURL == true ]]; then
-      curl -O $url
-    else
-      wget $url
-    fi
-    if [[ $? != 0 ]]; then
-      echo File download failed for URL:
-      echo $url
-      exit 0
-    fi
+    echo Fetching $1/$(basename $url)
+    get_file $url
   done
 
   dirs=$(echo $res | jq -r '.[] | select(.type=="dir") | .name')
   for dir in $dirs; do
-    get_folder $1/$dir
+    get_dir $1/$dir
   done
+
   cd ..
 }
 
-dest_name=`basename $rootfolder`
-if [[ -e $dest_name ]]; then
-  echo Error: $dest_name already exists in current folder
-  echo
-  exit 0
+if [[ ! -z $2 ]]; then
+  cd $2
 fi
-get_folder contents/$rootfolder
+
+get_dir contents/$rootdir
 
 # https://api.github.com/repos/ben-willmore/portmaster/contents/doutkutsu-rs?ref=main
 #for url in $(curl -s https://api.github.com/repos/$user/$repo/contents/$folder | jq -r '.[] | select(.type=="file") | .download_url'); do
