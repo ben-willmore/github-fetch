@@ -29,6 +29,16 @@ if [[ -z $res ]]; then
   exit 1
 fi
 
+res=$(../github-fetch -p https://github.com/ben-willmore/github-fetch/tree/testbranch \
+      | tr '\n' ' ' \
+      | grep "user=ben-willmore repo=github-fetch type=tree ref=testbranch root=")
+if [[ -z $res ]]; then
+  echo Fail
+  exit 1
+fi
+
+
+
 # parse file URLs
 res=$(../github-fetch -p https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/four \
       | tr '\n' ' ' \
