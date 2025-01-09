@@ -119,10 +119,14 @@ if [[ $1 == '-h' ]] || [[ $1 == '--help' ]]; then
   echo
   echo Fetch a directory from Github
   echo
-  echo Syntax: github-dir \<url\> [\<dest_dir\>] where \<url\> is of the form:
+  echo Syntax: github-fetchdir \<url\> [\<dest_dir\>] where \<url\> is of the form:
+  echo https://github.com/ben-willmore/portmaster/
+  echo  \(whole repo, default branch\)
   echo https://github.com/ben-willmore/portmaster/tree/main/perfectdark
+  echo  \(subdirectory, main branch\)
   echo https://github.com/ben-willmore/portmaster/tree/50c7502bc0b04f61dd94939735302c8d8fc18c4d/perfectdark
-  echo and can be pasted from a browser page that shows a directory
+  echo  \(subdirectory, specific commit)\
+  echo The URL can be pasted from a browser page that shows a directory.
   echo
   echo If \<dest_dir\> is supplied, the fetched directory will be put there\;
   echo otherwise it will be put in the current directory.
