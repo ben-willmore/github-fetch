@@ -6,7 +6,7 @@ apiurl=https://api.github.com
 
 github_api () {
   if [[ $use_curl == true ]]; then
-    res=$(curl $apiurl/$1 2>/dev/null)
+    res=$(curl -sS $apiurl/$1)
   else
     res=$(wget -qO- $apiurl/$1)
   fi
@@ -57,9 +57,9 @@ raise_api_error () {
 download_file () {
   echo Fetching URL: $1
   if [[ $use_curl == true ]]; then
-    curl -O $1 2>/dev/null
+    curl -sS -O $1 2>/dev/null
   else
-    wget $1
+    wget -nv $1
   fi
   if [[ $? != 0 ]]; then
     echo File download failed for URL:

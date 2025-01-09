@@ -69,7 +69,7 @@ if [[ -z $(md5sum different_dir/three | grep febe6995bad457991331348f7b9c85fa) ]
   echo Fail
   exit 1
 fi
-rm three
+rm -r different_dir
 
 # get whole repo
 ../github-fetch https://github.com/ben-willmore/github-fetch
@@ -85,14 +85,25 @@ if [[ -z $(md5sum test/subdir/four | grep 75ffdb827341e578959bfcabde3789d8) ]]; 
   echo Fail
   exit 1
 fi
+rm -r test
 
-# get subdir into different directory
+# get subdir into different destination directory
 mkdir different_dir
 ../github-fetch https://github.com/ben-willmore/github-fetch/tree/main/test ./different_dir
 if [[ -z $(md5sum different_dir/test/subdir/four | grep 75ffdb827341e578959bfcabde3789d8) ]]; then
   echo Fail
   exit 1
 fi
+rm -r different_dir
+
+# get subdir into different destination directory, using wget
+mkdir different_dir
+../github-fetch -w https://github.com/ben-willmore/github-fetch/tree/main/test ./different_dir
+if [[ -z $(md5sum different_dir/test/subdir/four | grep 75ffdb827341e578959bfcabde3789d8) ]]; then
+  echo Fail
+  exit 1
+fi
+rm -r different_dir
 
 cd ..
 rm -r github-fetch-test.tmp
