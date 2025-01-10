@@ -87,25 +87,7 @@ download_file () {
   fi
 }
 
-get_dir () {
-  pd="$(pwd)"
-  pwd_short="${pd#$dest_dir}"
-  # echo --- $pd $dest_dir $pwd_short
-  # echo ----- "${2}"
-  if [[ -z $pwd_short ]]; then
-    dir_short="${2}"
-  else
-    dir_short="${pwd_short}/${2}"
-  fi
-  if [[ -e "${2}" ]]; then
-    echo Error: "${dir_short} already exists\; can\'t create directory"
-    echo
-    exit 5
-  fi
-  echo "Making directory \"${dir_short}/\""
-  mkdir "${2}"
-  cd "${2}"
-  
+get_dir () {  
   if [[ $n_api_calls == 0 ]]; then
     echo Base API URL: $1
     echo
@@ -114,20 +96,35 @@ get_dir () {
   local res=$(github_api $1)
   n_api_calls=$((n_api_calls+1))
 
-  file_urls=$(echo $res | jq -r '.[] | select(.type=="file") | .download_url' 2>/dev/null)  
+  dir_urls=$(echo $res | jq -r '.[] | select(.type=="dir") | .url' 2>/dev/null)
   if [[ $? != 0 ]]; then
     raise_api_error "Could not parse API response" $1
   fi
-  for url in $file_urls; do
-    filename=$(echo $res | jq -r '.[] | select(.download_url==$ENV.url) | .name')
-    echo Fetching $url to \"${dir_short}/${filename}\"
-    download_file $url "${filename}"
+
+  for url in $dir_urls; do
+    export url="${url}"
+    dirpath=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')
+    mkdir -p "${dirpath}"
   done
 
-  dir_urls=$(echo $res | jq -r '.[] | select(.type=="dir") | .url')
-  for url in $dir_urls; do
-    dirname=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .name')
-    get_dir $url "${dirname}"
+  file_urls=$(echo $res | jq -r '.[] | select(.type=="file") | .url' 2>/dev/null)  
+  if [[ $? != 0 ]]; then
+    raise_api_error "Could not parse API response" $1
+  fi
+
+  # ensure root directory exists (in case no directories were made)
+  url="$(echo $file_urls | cut -d' ' -f1)"
+  export url="${url}"
+  filepath=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')
+  root_dir="$(echo $filepath | cut -d/ -f1)"
+  mkdir -p "${root_dir}"
+
+  for url in $file_urls; do
+    export url="${url}"
+    filepath=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')
+    dl_url=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .download_url')
+    echo Fetching ${dl_url} to \"${filepath}\"
+    download_file "${dl_url}" "${filepath}"
   done
 
   cd ..
@@ -169,7 +166,7 @@ if [[ $1 == '-h' ]] || [[ $1 == '--help' ]]; then
   echo otherwise it will be put in the current directory.
   echo
   echo This should work on any unix system with basic tools installed
-  echo \(bash, sed, grep, ...\), including jq and either curl or wget. 
+  echo \(bash, sed, grep, ...\), including jq and wget. 
   exit 0
 fi
 
@@ -203,7 +200,7 @@ for arg in "$@"; do
   fi
 done
 
-use_curl=true
+use_curl=false
 for arg in $args; do
   case $arg in
     --*limit*)
@@ -214,9 +211,9 @@ for arg in $args; do
     --*parse*)
       parse_only=true
       ;;
-    --*wget*)
-      use_curl=false
-      ;;
+    # --*wget*)
+    #   use_curl=false
+    #   ;;
   esac
 done
 
@@ -226,17 +223,23 @@ if [[ -z $input_url ]]; then
   exit 7
 fi
 
-which_curl=$(which curl)
+# which_curl=$(which curl)
 which_wget=$(which wget)
 
-if [[ -z $which_curl ]] && [[ -z $which_wget ]]; then
-  echo Error: Neither curl nor wget is available
+# if [[ -z $which_curl ]] && [[ -z $which_wget ]]; then
+#   echo Error: Neither curl nor wget is available
+#   echo
+#   exit 8
+# elif [[ $use_curl == true ]] && [[ -z $which_curl ]]; then
+#   use_curl=false
+# elif [[ $use_curl == false ]] && [[ -z $which_curl ]]; then
+#   use_curl=true
+# fi
+
+if [[ -z $which_wget ]]; then
+  echo Error: wget is not available
   echo
   exit 8
-elif [[ $use_curl == true ]] && [[ -z $which_curl ]]; then
-  use_curl=false
-elif [[ $use_curl == false ]] && [[ -z $which_curl ]]; then
-  use_curl=true
 fi
 
 # parse URL
@@ -295,16 +298,24 @@ fi
 dest_dir="$(pwd)"
 
 if [[ $type == tree ]]; then
-  # directory
-  if [[ ! -z $ref ]]; then
-    refstr="?ref=$ref"
-  fi
-  if [[ -z $root ]]; then
-    get_dir $apiurl/repos/$user/$repo/contents$refstr $repo
+  api_rq_url=$apiurl/repos/$user/$repo/contents
+  
+  if [[ ! -z $root ]]; then
+    api_rq_url+="/$root"
   else
-    base=$(basename $root)
-    get_dir $apiurl/repos/$user/$repo/contents/$root$refstr $(urldecode $base)
+    repo_name=$(urldecode $repo)
+    mkdir "${repo_name}"
+    cd "${repo_name}"
   fi
+
+  if [[ ! -z $ref ]]; then
+    api_rq_url+="?ref=$ref&recursive=1"
+  else
+    api_rq_url+="?recursive=1"
+  fi
+
+  echo -- $api_rq_url
+  get_dir $api_rq_url $create_root
 
 elif [[ $type == blob ]]; then
   # file
@@ -314,4 +325,4 @@ elif [[ $type == blob ]]; then
 fi
 
 echo
-echo Finished -- used $n_api_calls Github API calls
+echo Finished

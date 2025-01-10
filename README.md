@@ -18,9 +18,8 @@ This should work on any unix system with basic tools installed (bash, sed, grep,
 
 ### Rate limit
 
-Note that github has an API limit of about 60 requests per hour for unauthenticated users. `github-fetchdir` will use one API call per directory or subdirectory, so it will not be able to download a directory with >59 subdirectories. No API calls are used to download a file. `github-fetchdir -l` will tell you how many requests you have left and when your quota will reset.
+Note that github has an API limit of about 60 requests per hour for unauthenticated users. `github-fetchdir` will use one API call to recursively list the selected directory, so you can use it about 60 times per hour (no limit on single files). `github-fetchdir -l` will tell you how many requests you have left and when your quota will reset.
 
 ### Limitations
 
 * The executable bit is not set -- information is not available in the API
-* It would be more efficient to make a single recursive API request

@@ -1,0 +1,16 @@
+# whole repo
+
+https://github.com/ben-willmore/github-fetch/tree/main
+https://github.com/ben-willmore/github-fetch/tree/testbranch
+
+# subdirs
+https://github.com/ben-willmore/github-fetch/tree/main/test
+https://github.com/ben-willmore/github-fetch/tree/testbranch/test
+https://github.com/ben-willmore/github-fetch/tree/main/test/sub%20dir
+https://github.com/ben-willmore/github-fetch/tree/aa25db658a2013f8a0004cbdbff3ff59ce3e0aaa/test
+
+# files
+https://github.com/ben-willmore/github-fetch/blob/aa25db658a2013f8a0004cbdbff3ff59ce3e0aaa/test/one
+https://github.com/ben-willmore/github-fetch/blob/main/test/special-chars/%22
+
+# add dirs with awkward names -- currently we only have files
