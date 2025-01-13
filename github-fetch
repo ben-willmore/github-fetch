@@ -99,7 +99,7 @@ download_file () {
 }
 
 get_dir () {  
-
+  echo $root
   if [[ ! -z "${2}" ]]; then
     parent="$(dirname ${root})/"
     make_dir "${root#$parent}"
@@ -126,16 +126,19 @@ get_dir () {
     mkdir -p "${dirpath#$parent}"
   done
 
-  file_urls="$(echo $res | jq -r '.[] | select(.type=="file") | .url' 2>/dev/null)"  
+  file_urls="$(echo $res | jq -r '.[] | select(.type=="file") | .url' 2>/dev/null)"
   if [[ $? != 0 ]]; then
     raise_api_error "Could not parse API response" "${1}"
   fi
 
-  for url in "${file_urls}"; do
+  for url in ${file_urls}; do
     export url="${url}"
     filepath=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')
+    echo $filepath
     dl_path="${filepath#$parent}"
+    echo $dl_path
     dl_dir="$(dirname ${dl_path})"
+    echo $dl_dir
     if [[ ! -z "${dl_dir}" ]]; then
       mkdir -p "${dl_dir}"
     fi
