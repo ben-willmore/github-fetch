@@ -99,47 +99,47 @@ download_file () {
 }
 
 get_dir () {  
-  echo "\"${root}\""
+
   if [[ ! -z "${2}" ]]; then
-    parent=$(dirname ${root})/
+    parent="$(dirname ${root})/"
     make_dir "${root#$parent}"
   fi
-  echo "\"${parent}\""
+
   if [[ $n_api_calls == 0 ]]; then
     echo Base API URL: $1
     echo
   fi
 
-  local res=$(github_api $1)
+  local res="$(github_api $1)"
   n_api_calls=$((n_api_calls+1))
 
   # not sure this is needed now that directories are made before every file
   # is downloaded -- can a directory exist on github without a file in it?
-  dir_urls=$(echo $res | jq -r '.[] | select(.type=="dir") | .url' 2>/dev/null)
+  dir_urls="$(echo ${res} | jq -r '.[] | select(.type=="dir") | .url' 2>/dev/null)"
   if [[ $? != 0 ]]; then
-    raise_api_error "Could not parse API response" $1
+    raise_api_error "Could not parse API response" "${1}"
   fi
 
-  for url in $dir_urls; do
+  for url in ${dir_urls}; do
     export url="${url}"
-    dirpath=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')
+    dirpath="$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')"
     mkdir -p "${dirpath#$parent}"
   done
 
-  file_urls=$(echo $res | jq -r '.[] | select(.type=="file") | .url' 2>/dev/null)  
+  file_urls="$(echo $res | jq -r '.[] | select(.type=="file") | .url' 2>/dev/null)"  
   if [[ $? != 0 ]]; then
-    raise_api_error "Could not parse API response" $1
+    raise_api_error "Could not parse API response" "${1}"
   fi
 
-  for url in $file_urls; do
+  for url in "${file_urls}"; do
     export url="${url}"
     filepath=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')
     dl_path="${filepath#$parent}"
-    dl_dir=$(dirname "${dl_path}")
+    dl_dir="$(dirname ${dl_path})"
     if [[ ! -z "${dl_dir}" ]]; then
       mkdir -p "${dl_dir}"
     fi
-    dl_url=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .download_url')
+    dl_url="$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .download_url')"
     echo Fetching ${dl_url} to \"${dl_path}\"
     download_file "${dl_url}" "${dl_path}"
   done
@@ -148,16 +148,16 @@ get_dir () {
 }
 
 get_file () {
-  url=https://raw.githubusercontent.com/$user/$repo/$ref/$1
+  url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${1}"
 
   if [[ -e "${2}" ]]; then
-    echo Error: $filename already exists\; can\'t create file
+    echo "Error: ${filename} already exists; can't create file"
     echo
     exit 3
   fi
 
-  echo Fetching $url to "${2}"
-  download_file $url "${2}"
+  echo "Fetching ${url} to ${2}"
+  download_file ${url} "${2}"
 }
 
 ## main program
@@ -280,7 +280,7 @@ if [[ ${url} == ${repo} ]]; then
   type=tree
   ref=
   root=
-  echo "Fetching ${user}:${repo} \(whole repo, default branch\)"
+  echo "Fetching ${user}:${repo} (whole repo, default branch)"
 else
   type="$(echo ${url} | cut -d/ -f1)"
   url="$(echo ${url/$type\//})"
@@ -290,7 +290,7 @@ else
   if [[ ${url} == ${ref} ]]; then
     # got whole URL already, get whole repo
     root=
-    echo "Fetching ${user}:${repo}@${ref} \(whole repo\)"
+    echo "Fetching ${user}:${repo}@${ref} (whole repo)"
   else
     root="$(echo ${url/$ref\//})"
     echo "Fetching ${user}:${repo}/${root}@${ref}"
