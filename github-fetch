@@ -73,6 +73,16 @@ raise_api_error () {
   exit 2
 }
 
+make_dir () {
+  mkdir "${1}"
+  if [[ $? != 0 ]]; then
+    echo "Error -- could not make directory:"
+    echo "`pwd`/${1}"
+    echo
+    exit 1
+  fi
+}
+
 download_file () {
   echo Fetching URL: $1
   echo to $2
@@ -92,6 +102,7 @@ get_dir () {
   echo "\"${root}\""
   if [[ ! -z "${2}" ]]; then
     parent=$(dirname ${root})/
+    make_dir "${root#$parent}"
   fi
   echo "\"${parent}\""
   if [[ $n_api_calls == 0 ]]; then
@@ -310,7 +321,7 @@ if [[ ${type} == tree ]]; then
     api_rq_url+="/${root}"
   else
     repo_name="$(urldecode ${repo})"
-    mkdir "${repo_name}"
+    make_dir "${repo_name}"
     cd "${repo_name}"
   fi
 
