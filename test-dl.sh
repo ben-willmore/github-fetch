@@ -78,6 +78,11 @@ $github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir
 test_fail
 teardown
 
+setup "Downloading whole repo to current directory"
+$github_fetch https://github.com/ben-willmore/github-fetch
+test_dir ./github-fetch/test $check_dir
+teardown
+
 setup "Downloading subdir to current directory"
 $github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
 test_dir ./test $check_dir
