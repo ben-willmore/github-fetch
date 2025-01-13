@@ -104,8 +104,10 @@ download_file () {
 get_dir () {
   if [[ -z "${2}" ]]; then
     dest_dir="$(urldecode ${repo})"
+    prefix=
   else
     dest_dir="${root}"
+    prefix="${root}/"
   fi
 
   make_dir "${dest_dir}"
@@ -127,11 +129,11 @@ get_dir () {
   for url in ${file_urls}; do
     export url="${url}"
     filepath=$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .path')
-    if [[ "${filepath}" != $root/* ]]; then
+    if [[ "${filepath}" != ${prefix}* ]]; then
       continue
     fi
 
-    dl_path="${filepath#$root/}"
+    dl_path="${filepath#$prefix}"
     dl_dir=$(dirname "${dl_path}")
     if [[ ! -z "${dl_dir}" ]]; then
       mkdir -p "${dl_dir}"
