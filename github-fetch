@@ -106,7 +106,7 @@ get_dir () {
     dest_dir="$(urldecode ${repo})"
     prefix=
   else
-    dest_dir="${root}"
+    dest_dir="$(basename ${root})"
     prefix="${root}/"
   fi
 
@@ -119,6 +119,20 @@ get_dir () {
   fi
 
   res="$(github_api $1)"
+
+  root_tail="${root}"
+  while [[ ! -z "${root_tail}" ]]; do
+    root_head=$(echo ${root_tail} | cut -d/ -f1)
+    root_tail=${root_tail#$root_head}
+    root_tail=${root_tail#/}
+    echo head: $root_head -- tail: $root_tail
+    export root_head="${root_head}"
+    tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
+    res="$(github_api $tree_url)"
+  done
+
+  echo $res > res.out
+
   n_api_calls=$((n_api_calls+1))
 
   file_urls="$(echo $res | jq -r '.tree[] | select(.type=="blob") | .url' 2>/dev/null)"
@@ -129,16 +143,12 @@ get_dir () {
   for url in ${file_urls}; do
     export url="${url}"
     filepath=$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .path')
-    if [[ "${filepath}" != ${prefix}* ]]; then
-      continue
-    fi
-
     dl_path="${filepath#$prefix}"
     dl_dir=$(dirname "${dl_path}")
     if [[ ! -z "${dl_dir}" ]]; then
       mkdir -p "${dl_dir}"
     fi
-    dl_url="https://raw.githubusercontent.com/${user}/${repo}/refs/heads/${ref}/${filepath}"
+    dl_url="https://raw.githubusercontent.com/${user}/${repo}/refs/heads/${ref}/${root}/${filepath}"
     perms="$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .mode')"
     echo Fetching ${dl_url} to \"${dl_path}\"
     download_file "${dl_url}" "${dl_path}" "${perms}"
@@ -322,7 +332,7 @@ if [[ ${type} == tree ]]; then
     ref=main
   fi
 
-  api_rq_url="${apiurl}/repos/${user}/${repo}/git/trees/${ref}?recursive=true"
+  api_rq_url="${apiurl}/repos/${user}/${repo}/git/trees/${ref}"
   
   get_dir "${api_rq_url}" "${root}"
 
