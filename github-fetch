@@ -149,10 +149,8 @@ get_dir () {
   for url in ${file_urls}; do
     export url="${url}"
     filepaths=$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .path')
-    echo ==fs $filepaths
     IFS=$'\n'
     for filepath in $filepaths; do
-      echo ==f $filepath
       dl_path="${filepath#$prefix}"
       dl_dir=$(dirname "${dl_path}")
       if [[ ! -z "${dl_dir}" ]]; then
