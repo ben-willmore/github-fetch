@@ -102,7 +102,6 @@ get_dir () {
   echo $root
   if [[ ! -z "${2}" ]]; then
     parent="$(dirname ${root})/"
-    echo =="${root#$parent}"==
     make_dir "${root#$parent}"
   fi
 
@@ -124,7 +123,6 @@ get_dir () {
   for url in ${dir_urls}; do
     export url="${url}"
     dirpath="$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')"
-    echo =="${dirpath#$parent}"=
     mkdir -p "${dirpath#$parent}"
   done
 
