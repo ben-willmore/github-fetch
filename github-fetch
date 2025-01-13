@@ -6,7 +6,7 @@ apiurl=https://api.github.com
 
 LANG=C
 
-urlencode() {
+urlencode () {
     local l=${#1}
     for (( i = 0 ; i < l ; i++ )); do
         local c=${1:i:1}
@@ -18,7 +18,7 @@ urlencode() {
     done
 }
 
-urldecode() {
+urldecode () {
     local data=${1//+/ }
     printf '%b' "${data//%/\x}"
 }
@@ -134,11 +134,8 @@ get_dir () {
   for url in ${file_urls}; do
     export url="${url}"
     filepath=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')
-    echo $filepath
     dl_path="${filepath#$parent}"
-    echo $dl_path
     dl_dir="$(dirname ${dl_path})"
-    echo $dl_dir
     if [[ ! -z "${dl_dir}" ]]; then
       mkdir -p "${dl_dir}"
     fi
@@ -221,6 +218,7 @@ for arg in "$@"; do
 done
 
 use_curl=false
+
 for arg in $args; do
   case $arg in
     --*limit*)
