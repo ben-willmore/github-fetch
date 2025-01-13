@@ -96,57 +96,51 @@ download_file () {
     echo "${1}"
     exit 4
   fi
+  if [[ ! -z "${3}"  ]]; then
+    chmod "${3#100}" "${2}"
+  fi
 }
 
-get_dir () {  
-  echo $root
-  if [[ ! -z "${2}" ]]; then
-    parent="$(dirname ${root})/"
-    make_dir "${root#$parent}"
+get_dir () {
+  if [[ -z "${2}" ]]; then
+    dest_dir="$(urldecode ${repo})"
+  else
+    dest_dir="${root}"
   fi
+
+  make_dir "${dest_dir}"
+  cd "${dest_dir}"
 
   if [[ $n_api_calls == 0 ]]; then
     echo Base API URL: $1
     echo
   fi
 
-  local res="$(github_api $1)"
+  res="$(github_api $1)"
   n_api_calls=$((n_api_calls+1))
 
-  # not sure this is needed now that directories are made before every file
-  # is downloaded -- can a directory exist on github without a file in it?
-  dir_urls="$(echo ${res} | jq -r '.[] | select(.type=="dir") | .url' 2>/dev/null)"
-  if [[ $? != 0 ]]; then
-    raise_api_error "Could not parse API response" "${1}"
-  fi
-
-  for url in ${dir_urls}; do
-    export url="${url}"
-    dirpath="$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')"
-    mkdir -p "${dirpath#$parent}"
-  done
-
-  file_urls="$(echo $res | jq -r '.[] | select(.type=="file") | .url' 2>/dev/null)"
+  file_urls="$(echo $res | jq -r '.tree[] | select(.type=="blob") | .url' 2>/dev/null)"
   if [[ $? != 0 ]]; then
     raise_api_error "Could not parse API response" "${1}"
   fi
 
   for url in ${file_urls}; do
     export url="${url}"
-    filepath=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')
-    dl_path="${filepath#$parent}"
+    filepath=$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .path')
+    if [[ "${filepath}" != $root/* ]]; then
+      continue
+    fi
+
+    dl_path="${filepath#$root/}"
     dl_dir=$(dirname "${dl_path}")
     if [[ ! -z "${dl_dir}" ]]; then
       mkdir -p "${dl_dir}"
     fi
-    dl_url="$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .download_url')"
+    dl_url="https://raw.githubusercontent.com/${user}/${repo}/refs/heads/${ref}/${filepath}"
+    perms="$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .mode')"
     echo Fetching ${dl_url} to \"${dl_path}\"
-    download_file "${dl_url}" "${dl_path}"
+    download_file "${dl_url}" "${dl_path}" "${perms}"
   done
-
-  if [[ -z ${skip_fix_permissions} ]]; then
-    fix_dir_permissions "${root#$parent}"
-  fi
 
   cd ..
 }
@@ -160,35 +154,8 @@ get_file () {
     exit 3
   fi
 
-  echo "Fetching ${url} to ${2}"
-  download_file ${url} "${2}"
-
-  if [[ -z ${skip_fix_permissions} ]]; then
-    fix_file_permissions "${2}" 
-  fi
-
-}
-
-fix_file_permissions () {
-  echo ==$1
-  res=$(grep -rv "\x00" "${1}" 2>/dev/null)
-  if [[ $? != 0 ]]; then
-    res=$(ggrep -P "[^\x00-\x7F]" "${1}" 2>/dev/null)
-  fi
-  if [[ -z "${res}" ]]; then
-    echo "${1}" bin
-  else
-    echo "${1}" not bin
-  fi
-}
-
-fix_dir_permissions () {
-  echo ====${1}
-  find "${1}" -type f | while read fil
-  do
-    echo ---${fil}
-    # fix_file_permissions "${fil}"
-  done
+  echo "Fetching ${url} to ${2} with perms ${3}"
+  download_file ${url} "${2}" "${3}"
 }
 
 ## main program
@@ -237,9 +204,6 @@ for arg in "$@"; do
         w)
           args+=" --wget"
           ;;
-        n)
-          args+=" --no-fix-permissions"
-          ;;
       esac
     done
   else
@@ -265,10 +229,8 @@ for arg in $args; do
       ;;
     # --*wget*)
     #   use_curl=false
-    #   ;;
-    --*no-fix-perm*)
-      skip_fix_permissions=true
-      ;;  esac
+    #   ;; 
+  esac
 done
 
 if [[ -z $input_url ]]; then
@@ -352,22 +314,14 @@ fi
 dest_dir="$(pwd)"
 
 if [[ ${type} == tree ]]; then
-  api_rq_url="${apiurl}/repos/${user}/${repo}/contents"
+
+  if [[ -z ${ref} ]]; then
+    echo FIXME!! Assuming main!!
+    ref=main
+  fi
+
+  api_rq_url="${apiurl}/repos/${user}/${repo}/git/trees/${ref}?recursive=true"
   
-  if [[ ! -z ${root} ]]; then
-    api_rq_url+="/${root}"
-  else
-    repo_name="$(urldecode ${repo})"
-    make_dir "${repo_name}"
-    cd "${repo_name}"
-  fi
-
-  if [[ ! -z ${ref} ]]; then
-    api_rq_url+="?ref=$ref&recursive=1"
-  else
-    api_rq_url+="?recursive=1"
-  fi
-
   get_dir "${api_rq_url}" "${root}"
 
 elif [[ ${type} == blob ]]; then
