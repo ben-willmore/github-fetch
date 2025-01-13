@@ -127,7 +127,7 @@ get_dir () {
     while [[ "${root_tail}" =~ .*./.* ]]; do
       root_head=$(echo ${root_tail} | cut -d/ -f1)
       root_tail=${root_tail#$root_head}
-      echo head: $root_head -- tail: $root_tail
+      export root_head="${root_head}"    
       tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
       res="$(github_api $tree_url)"
     done
