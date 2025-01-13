@@ -148,16 +148,21 @@ get_dir () {
 
   for url in ${file_urls}; do
     export url="${url}"
-    filepath=$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .path')
-    dl_path="${filepath#$prefix}"
-    dl_dir=$(dirname "${dl_path}")
-    if [[ ! -z "${dl_dir}" ]]; then
-      mkdir -p "${dl_dir}"
-    fi
-    dl_url="https://raw.githubusercontent.com/${user}/${repo}/refs/heads/${ref}/${root}/${filepath}"
-    perms="$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .mode')"
-    echo Fetching ${dl_url} to \"${dl_path}\"
-    download_file "${dl_url}" "${dl_path}" "${perms}"
+    filepaths=$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .path')
+    echo ==fs $filepaths
+    IFS=$'\n'
+    for filepath in $filepaths; do
+      echo ==f $filepath
+      dl_path="${filepath#$prefix}"
+      dl_dir=$(dirname "${dl_path}")
+      if [[ ! -z "${dl_dir}" ]]; then
+        mkdir -p "${dl_dir}"
+      fi
+      dl_url="https://raw.githubusercontent.com/${user}/${repo}/refs/heads/${ref}/${root}/${filepath}"
+      perms="$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .mode')"
+      echo Fetching ${dl_url} to \"${dl_path}\"
+      download_file "${dl_url}" "${dl_path}" "${perms}"
+    done
   done
 
   cd ..
