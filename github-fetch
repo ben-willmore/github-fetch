@@ -74,7 +74,8 @@ raise_api_error () {
 }
 
 download_file () {
-  # echo Fetching URL: $1
+  echo Fetching URL: $1
+  echo to $2
   if [[ $use_curl == true ]]; then
     curl -sS -o "./${2}" "${1}"
   else
@@ -88,6 +89,11 @@ download_file () {
 }
 
 get_dir () {  
+  echo "\"${root}\""
+  if [[ ! -z "${2}" ]]; then
+    parent=$(dirname ${root})/
+  fi
+  echo "\"${parent}\""
   if [[ $n_api_calls == 0 ]]; then
     echo Base API URL: $1
     echo
@@ -96,6 +102,8 @@ get_dir () {
   local res=$(github_api $1)
   n_api_calls=$((n_api_calls+1))
 
+  # not sure this is needed now that directories are made before every file
+  # is downloaded -- can a directory exist on github without a file in it?
   dir_urls=$(echo $res | jq -r '.[] | select(.type=="dir") | .url' 2>/dev/null)
   if [[ $? != 0 ]]; then
     raise_api_error "Could not parse API response" $1
@@ -104,7 +112,7 @@ get_dir () {
   for url in $dir_urls; do
     export url="${url}"
     dirpath=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')
-    mkdir -p "${dirpath}"
+    mkdir -p "${dirpath#$parent}"
   done
 
   file_urls=$(echo $res | jq -r '.[] | select(.type=="file") | .url' 2>/dev/null)  
@@ -112,19 +120,17 @@ get_dir () {
     raise_api_error "Could not parse API response" $1
   fi
 
-  # ensure root directory exists (in case no directories were made)
-  url="$(echo $file_urls | cut -d' ' -f1)"
-  export url="${url}"
-  filepath=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')
-  root_dir="$(echo $filepath | cut -d/ -f1)"
-  mkdir -p "${root_dir}"
-
   for url in $file_urls; do
     export url="${url}"
     filepath=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .path')
+    dl_path="${filepath#$parent}"
+    dl_dir=$(dirname "${dl_path}")
+    if [[ ! -z "${dl_dir}" ]]; then
+      mkdir -p "${dl_dir}"
+    fi
     dl_url=$(echo $res | jq -r '.[] | select(.url==$ENV.url) | .download_url')
-    echo Fetching ${dl_url} to \"${filepath}\"
-    download_file "${dl_url}" "${filepath}"
+    echo Fetching ${dl_url} to \"${dl_path}\"
+    download_file "${dl_url}" "${dl_path}"
   done
 
   cd ..
@@ -257,35 +263,35 @@ url="$(echo ${url/$user\//})"
 repo="$(echo $url | cut -d/ -f1)"
 url="$(echo ${url/$repo\//})"
 
-if [[ $url == $repo ]]; then
+if [[ ${url} == ${repo} ]]; then
   # there is no tree|blob in the URL
   # use default branch and get whole repo
   type=tree
   ref=
   root=
-  echo Fetching $user:$repo \(whole repo, default branch\)
+  echo "Fetching ${user}:${repo} \(whole repo, default branch\)"
 else
-  type="$(echo $url | cut -d/ -f1)"
+  type="$(echo ${url} | cut -d/ -f1)"
   url="$(echo ${url/$type\//})"
 
-  ref="$(echo $url | cut -d/ -f1)"
+  ref="$(echo ${url} | cut -d/ -f1)"
 
-  if [[ $url == $ref ]]; then
+  if [[ ${url} == ${ref} ]]; then
     # got whole URL already, get whole repo
     root=
-    echo Fetching $user:$repo@$ref \(whole repo\)
+    echo "Fetching ${user}:${repo}@${ref} \(whole repo\)"
   else
     root="$(echo ${url/$ref\//})"
-    echo Fetching $user:$repo/$root@$ref
+    echo "Fetching ${user}:${repo}/${root}@${ref}"
   fi
 fi
 
 if [[ $parse_only == true ]]; then
-  echo user=$user
-  echo repo=$repo
-  echo type=$type
-  echo ref=$ref
-  echo root=$root
+  echo user=${user}
+  echo repo=${repo}
+  echo type=${type}
+  echo ref=${ref}
+  echo root=${root}
   exit 0
 fi
 
@@ -297,30 +303,30 @@ fi
 
 dest_dir="$(pwd)"
 
-if [[ $type == tree ]]; then
-  api_rq_url=$apiurl/repos/$user/$repo/contents
+if [[ ${type} == tree ]]; then
+  api_rq_url="${apiurl}/repos/${user}/${repo}/contents"
   
-  if [[ ! -z $root ]]; then
-    api_rq_url+="/$root"
+  if [[ ! -z ${root} ]]; then
+    api_rq_url+="/${root}"
   else
-    repo_name=$(urldecode $repo)
+    repo_name="$(urldecode ${repo})"
     mkdir "${repo_name}"
     cd "${repo_name}"
   fi
 
-  if [[ ! -z $ref ]]; then
+  if [[ ! -z ${ref} ]]; then
     api_rq_url+="?ref=$ref&recursive=1"
   else
     api_rq_url+="?recursive=1"
   fi
 
-  echo -- $api_rq_url
-  get_dir $api_rq_url $create_root
+  echo "-- ${api_rq_url}"
+  get_dir "${api_rq_url}" "${root}"
 
-elif [[ $type == blob ]]; then
+elif [[ ${type} == blob ]]; then
   # file
-  base=$(basename $root)
-  get_file $root $(urldecode $base)
+  base="$(basename ${root})"
+  get_file "${root}" "$(urldecode ${base})"
 
 fi
 
