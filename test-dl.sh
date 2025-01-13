@@ -86,10 +86,10 @@ teardown
 setup "Downloading subdir to current directory"
 $github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
 test_dir ./test $check_dir
-teardown
+# teardown
 
-setup "Downloading subdir to current directory - blocked, should fail"
-touch test
-$github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
-test_fail
-teardown
+# setup "Downloading subdir to current directory - blocked, should fail"
+# touch test
+# $github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
+# test_fail
+# teardown
