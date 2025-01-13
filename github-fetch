@@ -144,6 +144,10 @@ get_dir () {
     download_file "${dl_url}" "${dl_path}"
   done
 
+  if [[ -z ${skip_fix_permissions} ]]; then
+    fix_dir_permissions "${root#$parent}"
+  fi
+
   cd ..
 }
 
@@ -158,6 +162,33 @@ get_file () {
 
   echo "Fetching ${url} to ${2}"
   download_file ${url} "${2}"
+
+  if [[ -z ${skip_fix_permissions} ]]; then
+    fix_file_permissions "${2}" 
+  fi
+
+}
+
+fix_file_permissions () {
+  echo ==$1
+  res=$(grep -rv "\x00" "${1}" 2>/dev/null)
+  if [[ $? != 0 ]]; then
+    res=$(ggrep -P "[^\x00-\x7F]" "${1}" 2>/dev/null)
+  fi
+  if [[ -z "${res}" ]]; then
+    echo "${1}" bin
+  else
+    echo "${1}" not bin
+  fi
+}
+
+fix_dir_permissions () {
+  echo ====${1}
+  find "${1}" -type f | while read fil
+  do
+    echo ---${fil}
+    # fix_file_permissions "${fil}"
+  done
 }
 
 ## main program
@@ -206,6 +237,9 @@ for arg in "$@"; do
         w)
           args+=" --wget"
           ;;
+        n)
+          args+=" --no-fix-permissions"
+          ;;
       esac
     done
   else
@@ -232,7 +266,9 @@ for arg in $args; do
     # --*wget*)
     #   use_curl=false
     #   ;;
-  esac
+    --*no-fix-perm*)
+      skip_fix_permissions=true
+      ;;  esac
 done
 
 if [[ -z $input_url ]]; then
@@ -332,13 +368,13 @@ if [[ ${type} == tree ]]; then
     api_rq_url+="?recursive=1"
   fi
 
-  echo "-- ${api_rq_url}"
   get_dir "${api_rq_url}" "${root}"
 
 elif [[ ${type} == blob ]]; then
   # file
   base="$(basename ${root})"
-  get_file "${root}" "$(urldecode ${base})"
+  dest_file="$(urldecode ${base})"
+  get_file "${root}" "${dest_file}"
 
 fi
 
