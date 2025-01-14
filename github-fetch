@@ -26,15 +26,15 @@ urldecode () {
 github_api () {
   if [[ $use_curl == true ]]; then
     res=$(curl -sS $1)
+    code=$?
   else
     res=$(wget -qO- $1)
+    code=$?
   fi
 
-  if [[ $? != 0 ]]; then
-    raise_api_error "API call failed" $1 >&2
-  fi
   n_api_calls=$((n_api_calls+1))
   echo $res
+  exit $code
 }
 
 get_rate_limit() {
@@ -126,9 +126,15 @@ get_dir () {
 
   if [[ -z "${2}" ]]; then
     res="$(github_api $1?recursive=true)"
+    if [[ $? != 0 ]]; then
+      raise_api_error "API call failed" $1 >&2
+    fi
 
   else
     res="$(github_api $1)"
+    if [[ $? != 0 ]]; then
+      raise_api_error "API call failed" $1 >&2
+    fi
     root_tail="${2}"
     while [[ "${root_tail}" =~ .*./.* ]]; do
       root_head=$(echo ${root_tail} | cut -d/ -f1)
@@ -137,12 +143,19 @@ get_dir () {
       export root_head="${root_head}"
       tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
       res="$(github_api $tree_url)"
+      if [[ $? != 0 ]]; then
+        raise_api_error "API call failed" $1 >&2
+      fi
+
     done
 
     root_head="$(urldecode ${root_tail#/})"
     export root_head="${root_head}"
     tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
     res="$(github_api $tree_url?recursive=true)"
+    if [[ $? != 0 ]]; then
+      raise_api_error "API call failed" $1 >&2
+    fi
 
   fi
 
@@ -161,8 +174,9 @@ get_dir () {
       if [[ ! -z "${dl_dir}" ]]; then
         mkdir -p "${dl_dir}"
       fi
+      export filepath="${filepath}"
+      perms="$(echo $res | jq -r '.tree[] | select(.path==$ENV.filepath) | .mode')"
       dl_url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${root}/${filepath}"
-      perms="$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .mode')"
       if [[ $verbose == true ]]; then
         echo Fetching \"${dl_url}\"
         echo as \"${dl_path}\"
@@ -182,6 +196,10 @@ get_file () {
   fi
 
   res="$(github_api $1)"
+  if [[ $? != 0 ]]; then
+    raise_api_error "API call failed" $1 >&2
+  fi
+
   root_tail="${2}"
   while [[ "${root_tail}" =~ .*./.* ]]; do
     root_head=$(echo ${root_tail} | cut -d/ -f1)
@@ -190,6 +208,10 @@ get_file () {
     export root_head="${root_head}"    
     tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
     res="$(github_api $tree_url)"
+    if [[ $? != 0 ]]; then
+      raise_api_error "API call failed" $1 >&2
+    fi
+
   done
 
   root_head="$(urldecode ${root_tail#/})"
@@ -371,7 +393,9 @@ fi
 if [[ -z ${ref} ]]; then
   api_rq_url="${apiurl}/repos/${user}/${repo}"
   res="$(github_api $api_rq_url)"
-  n_api_calls=$((n_api_calls+1))
+  if [[ $? != 0 ]]; then
+    raise_api_error "API call failed" $1 >&2
+  fi
 
   ref="$(echo $res | jq -r '.default_branch' 2>/dev/null)"
 
