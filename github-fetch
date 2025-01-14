@@ -108,11 +108,11 @@ download_file () {
 
 get_dir () {
   if [[ -z "${2}" ]]; then
-    dest_dir="$(urldecode ${repo})"
+    dest_dir=$(urldecode "${repo}")
     prefix=
   else
     base="$(basename ${2})"
-    dest_dir="$(urldecode ${base})"
+    dest_dir=$(urldecode "${base}")
     prefix="${2}/"
   fi
 
@@ -137,9 +137,9 @@ get_dir () {
     fi
     root_tail="${2}"
     while [[ "${root_tail}" =~ .*./.* ]]; do
-      root_head=$(echo ${root_tail} | cut -d/ -f1)
-      root_tail=${root_tail#$root_head}
-      root_head="$(urldecode ${root_head})"
+      root_head="$(echo ${root_tail} | cut -d/ -f1)"
+      root_tail="${root_tail#$root_head}"
+      root_head=$(urldecode "${root_head}")
       export root_head="${root_head}"
       tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
       res="$(github_api $tree_url)"
@@ -149,7 +149,7 @@ get_dir () {
 
     done
 
-    root_head="$(urldecode ${root_tail#/})"
+    root_head=$(urldecode "${root_tail#/}")
     export root_head="${root_head}"
     tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
     res="$(github_api $tree_url?recursive=true)"
@@ -202,9 +202,9 @@ get_file () {
 
   root_tail="${2}"
   while [[ "${root_tail}" =~ .*./.* ]]; do
-    root_head=$(echo ${root_tail} | cut -d/ -f1)
-    root_tail=${root_tail#$root_head/}
-    root_head="$(urldecode ${root_head})"
+    root_head="$(echo ${root_tail} | cut -d/ -f1)"
+    root_tail="${root_tail#$root_head/}"
+    root_head=$(urldecode "${root_head}")
     export root_head="${root_head}"    
     tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
     res="$(github_api $tree_url)"
@@ -214,7 +214,7 @@ get_file () {
 
   done
 
-  root_head="$(urldecode ${root_tail#/})"
+  root_head=$(urldecode "${root_tail#/}")
   export root_head="${root_head}"
   filepath="$(echo $res | jq -r '.tree[] | select(.type=="blob" and .path==$ENV.root_head) | .path' 2>/dev/null)"
   perms="$(echo $res | jq -r '.tree[] | select(.type=="blob" and .path==$ENV.root_head) | .mode' 2>/dev/null)"
