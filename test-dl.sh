@@ -123,9 +123,32 @@ git clone https://github.com/ben-willmore/github-fetch $git_dir
 # test_file $test_dir/three $check_dir/subdir/three
 # teardown
 
+# setup "Downloading subdir to current directory -- alt branch"
+# git_checkout testbranch
+# $github_fetch https://github.com/ben-willmore/github-fetch/tree/testbranch/test
+# test_dir ./test $check_dir
+# teardown
+
 # setup "Downloading whole repo to current directory -- alt branch"
 # git_checkout testbranch
 # $github_fetch https://github.com/ben-willmore/github-fetch/tree/testbranch
 # test_dir ./github-fetch/test $check_dir
 # teardown
 
+setup "Downloading single file to current directory -- specific commit"
+git_checkout b705c8521553926a84609816d3f5ed8814945aee
+$github_fetch https://github.com/ben-willmore/github-fetch/blob/b705c8521553926a84609816d3f5ed8814945aee/test/sub%20dir/s%20e%20v%20e%20n
+test_file "$test_dir/s e v e n" "$check_dir/sub dir/s e v e n"
+teardown
+
+setup "Downloading subdir to current directory -- specific commit"
+git_checkout b705c8521553926a84609816d3f5ed8814945aee
+$github_fetch https://github.com/ben-willmore/github-fetch/tree/b705c8521553926a84609816d3f5ed8814945aee/test
+test_dir ./test $check_dir
+teardown
+
+setup "Downloading whole repo to current directory -- specific commit"
+git_checkout b705c8521553926a84609816d3f5ed8814945aee
+$github_fetch https://github.com/ben-willmore/github-fetch/tree/b705c8521553926a84609816d3f5ed8814945aee
+test_dir ./github-fetch/test $check_dir
+teardown
