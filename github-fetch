@@ -33,6 +33,7 @@ github_api () {
   if [[ $? != 0 ]]; then
     raise_api_error "API call failed" $1 >&2
   fi
+  n_api_calls=$((n_api_calls+1))
   echo $res
 }
 
@@ -110,8 +111,8 @@ get_dir () {
     dest_dir="$(urldecode ${repo})"
     prefix=
   else
-    dest_dir="$(basename ${root})"
-    prefix="${root}/"
+    dest_dir="$(basename ${2})"
+    prefix="${2}/"
   fi
 
   make_dir "${dest_dir}"
@@ -122,12 +123,12 @@ get_dir () {
     echo
   fi
 
-  if [[ -z "${root}" ]]; then
+  if [[ -z "${2}" ]]; then
     res="$(github_api $1?recursive=true)"
 
   else
     res="$(github_api $1)"
-    root_tail="${root}"
+    root_tail="${2}"
     while [[ "${root_tail}" =~ .*./.* ]]; do
       root_head=$(echo ${root_tail} | cut -d/ -f1)
       root_tail=${root_tail#$root_head}
@@ -142,8 +143,6 @@ get_dir () {
     res="$(github_api $tree_url?recursive=true)"
 
   fi
-
-  n_api_calls=$((n_api_calls+1))
 
   file_urls="$(echo $res | jq -r '.tree[] | select(.type=="blob") | .url' 2>/dev/null)"
   if [[ $? != 0 ]]; then
@@ -175,6 +174,8 @@ get_dir () {
 }
 
 get_file () {
+
+  
   url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${1}"
 
   if [[ -e "${2}" ]]; then

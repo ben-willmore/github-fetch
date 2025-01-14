@@ -1,6 +1,10 @@
 #!/bin/bash
 
-# could git clone here to make sure checkout has right version of repo
+# need to git clone here to make sure checkout has right version of repo
+# add tests for -- different branches
+# single files with pathological names
+# permissions
+# symlinks
 
 md5file () {
     md5sum "${1}" | awk '{print $1}'
