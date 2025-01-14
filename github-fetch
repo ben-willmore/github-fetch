@@ -20,7 +20,7 @@ urlencode () {
 
 urldecode () {
     local data=${1//+/ }
-    printf '%b' "${data//%/\x}"
+    printf '%b' "${data//%/\\x}"
 }
 
 github_api () {
@@ -370,8 +370,9 @@ if [[ ${type} == tree ]]; then
 
 elif [[ ${type} == blob ]]; then
   # file
+  # FIXME! No permissions
   base="$(basename ${root})"
-  dest_file="$(urldecode ${base})"
+  dest_file=$(urldecode ${base})
   get_file "${root}" "${dest_file}"
 
 fi
