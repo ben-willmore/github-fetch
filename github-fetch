@@ -59,7 +59,7 @@ raise_api_error () {
 
   api_limit=$(get_rate_limit)
   n_remaining="$(echo $api_limit | cut -d" " -f1)"
-  if [[ n_remaining == 0 ]]; then
+  if [[ $n_remaining == 0 ]]; then
     echo Github API rate limit reached:
     echo $api_limit
   else
@@ -111,7 +111,8 @@ get_dir () {
     dest_dir="$(urldecode ${repo})"
     prefix=
   else
-    dest_dir="$(basename ${2})"
+    base="$(basename ${2})"
+    dest_dir="$(urldecode ${base})"
     prefix="${2}/"
   fi
 
@@ -132,12 +133,13 @@ get_dir () {
     while [[ "${root_tail}" =~ .*./.* ]]; do
       root_head=$(echo ${root_tail} | cut -d/ -f1)
       root_tail=${root_tail#$root_head}
-      export root_head="${root_head}"    
+      root_head="$(urldecode ${root_head})"
+      export root_head="${root_head}"
       tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
       res="$(github_api $tree_url)"
     done
 
-    root_head=${root_tail#/}
+    root_head="$(urldecode ${root_tail#/})"
     export root_head="${root_head}"
     tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
     res="$(github_api $tree_url?recursive=true)"
@@ -174,18 +176,37 @@ get_dir () {
 }
 
 get_file () {
+  if [[ $n_api_calls == 0 ]]; then
+    echo Base API URL: $1
+    echo
+  fi
 
-  
-  url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${1}"
+  res="$(github_api $1)"
+  root_tail="${2}"
+  while [[ "${root_tail}" =~ .*./.* ]]; do
+    root_head=$(echo ${root_tail} | cut -d/ -f1)
+    root_tail=${root_tail#$root_head/}
+    root_head="$(urldecode ${root_head})"
+    export root_head="${root_head}"    
+    tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
+    res="$(github_api $tree_url)"
+  done
 
-  if [[ -e "${2}" ]]; then
+  root_head="$(urldecode ${root_tail#/})"
+  export root_head="${root_head}"
+  filepath="$(echo $res | jq -r '.tree[] | select(.type=="blob" and .path==$ENV.root_head) | .path' 2>/dev/null)"
+  perms="$(echo $res | jq -r '.tree[] | select(.type=="blob" and .path==$ENV.root_head) | .mode' 2>/dev/null)"
+
+  url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${2}"
+
+  if [[ -e "${filepath}" ]]; then
     echo "Error: ${filename} already exists; can't create file"
     echo
     exit 3
   fi
 
-  echo "Fetching ${url} to ${2} with perms ${3}"
-  download_file ${url} "${2}" "${3}"
+  echo "Fetching ${url} to ${filepath} with perms ${perms}"
+  download_file "${url}" "${filepath}" "${perms}"
 }
 
 ## main program
@@ -347,34 +368,28 @@ if [[ ! -z "${dest_dir}" ]]; then
   cd "${dest_dir}"
 fi
 
-dest_dir="$(pwd)"
+if [[ -z ${ref} ]]; then
+  api_rq_url="${apiurl}/repos/${user}/${repo}"
+  res="$(github_api $api_rq_url)"
+  n_api_calls=$((n_api_calls+1))
 
-if [[ ${type} == tree ]]; then
+  ref="$(echo $res | jq -r '.default_branch' 2>/dev/null)"
 
-  if [[ -z ${ref} ]]; then
-    api_rq_url="${apiurl}/repos/${user}/${repo}"
-    res="$(github_api $api_rq_url)"
-    n_api_calls=$((n_api_calls+1))
-
-    ref="$(echo $res | jq -r '.default_branch' 2>/dev/null)"
-
-    if [[ $? != 0 ]]; then
-      raise_api_error "Could not parse API response" "${1}"
-    fi
-
-    echo Using default branch: $ref
+  if [[ $? != 0 ]]; then
+    raise_api_error "Could not parse API response" "${1}"
   fi
 
-  api_rq_url="${apiurl}/repos/${user}/${repo}/git/trees/${ref}"
+  echo Using default branch: $ref
+fi
 
+api_rq_url="${apiurl}/repos/${user}/${repo}/git/trees/${ref}"
+
+if [[ ${type} == tree ]]; then
   get_dir "${api_rq_url}" "${root}"
 
 elif [[ ${type} == blob ]]; then
-  # file
-  # FIXME! No permissions
-  base="$(basename ${root})"
-  dest_file=$(urldecode ${base})
-  get_file "${root}" "${dest_file}"
+  target=$(urldecode "${root}")
+  get_file "${api_rq_url}" "${target}"
 
 fi
 

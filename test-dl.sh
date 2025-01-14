@@ -1,8 +1,11 @@
 #!/bin/bash
 
 # need to git clone here to make sure checkout has right version of repo
-# add tests for -- different branches
+# add tests for:
+# different branches
 # single files with pathological names
+# pathological paths as well as final names
+# unicode chars like tilde-n
 # permissions
 # symlinks
 
