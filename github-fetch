@@ -161,7 +161,7 @@ get_dir () {
       if [[ ! -z "${dl_dir}" ]]; then
         mkdir -p "${dl_dir}"
       fi
-      dl_url="https://raw.githubusercontent.com/${user}/${repo}/refs/heads/${ref}/${root}/${filepath}"
+      dl_url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${root}/${filepath}"
       perms="$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .mode')"
       if [[ $verbose == true ]]; then
         echo Fetching \"${dl_url}\"
