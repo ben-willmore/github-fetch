@@ -337,12 +337,22 @@ dest_dir="$(pwd)"
 if [[ ${type} == tree ]]; then
 
   if [[ -z ${ref} ]]; then
-    echo FIXME!! Assuming main!!
-    ref=main
+    api_rq_url="${apiurl}/repos/${user}/${repo}"
+    res="$(github_api $api_rq_url)"
+    n_api_calls=$((n_api_calls+1))
+    echo $res > res.out
+
+    ref="$(echo $res | jq -r '.default_branch' 2>/dev/null)"
+
+    if [[ $? != 0 ]]; then
+      raise_api_error "Could not parse API response" "${1}"
+    fi
+
+    echo Using default branch: $ref
   fi
 
   api_rq_url="${apiurl}/repos/${user}/${repo}/git/trees/${ref}"
-  
+
   get_dir "${api_rq_url}" "${root}"
 
 elif [[ ${type} == blob ]]; then
