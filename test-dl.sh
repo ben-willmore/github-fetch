@@ -2,7 +2,8 @@
 
 # need to git clone here to make sure checkout has right version of repo
 # add tests for:
-# different branches
+# different branches, commits, e.g.:
+# https://github.com/ben-willmore/PortMaster-New/tree/58e7be051e7b24740d82dd65a4ac837d3d416006/ports/hurrican
 # single files with pathological names
 # pathological paths as well as final names
 # unicode chars like tilde-n
