@@ -127,7 +127,7 @@ get_dir () {
   if [[ -z "${2}" ]]; then
     res="$(github_api $1?recursive=true)"
     if [[ $? != 0 ]]; then
-      raise_api_error "API call failed" $1 >&2
+      raise_api_error "API call failed" $1?recursive=true >&2
     fi
 
   else
@@ -144,7 +144,7 @@ get_dir () {
       tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
       res="$(github_api $tree_url)"
       if [[ $? != 0 ]]; then
-        raise_api_error "API call failed" $1 >&2
+        raise_api_error "API call failed" $tree_url >&2
       fi
 
     done
@@ -154,7 +154,7 @@ get_dir () {
     tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
     res="$(github_api $tree_url?recursive=true)"
     if [[ $? != 0 ]]; then
-      raise_api_error "API call failed" $1 >&2
+      raise_api_error "API call failed" $tree_url?recursive=true >&2
     fi
 
   fi
@@ -209,7 +209,7 @@ get_file () {
     tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
     res="$(github_api $tree_url)"
     if [[ $? != 0 ]]; then
-      raise_api_error "API call failed" $1 >&2
+      raise_api_error "API call failed" $tree_url >&2
     fi
 
   done
@@ -394,13 +394,13 @@ if [[ -z ${ref} ]]; then
   api_rq_url="${apiurl}/repos/${user}/${repo}"
   res="$(github_api $api_rq_url)"
   if [[ $? != 0 ]]; then
-    raise_api_error "API call failed" $1 >&2
+    raise_api_error "API call failed" $api_rq_url >&2
   fi
 
   ref="$(echo $res | jq -r '.default_branch' 2>/dev/null)"
 
   if [[ $? != 0 ]]; then
-    raise_api_error "Could not parse API response" "${1}"
+    raise_api_error "Could not parse API response" "$api_rq_url" >&2
   fi
 
   echo Using default branch: $ref
