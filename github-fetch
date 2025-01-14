@@ -84,8 +84,12 @@ make_dir () {
 }
 
 download_file () {
-  echo Fetching URL: $1
-  echo to $2
+  if [[ $verbose == true ]]; then
+    echo "Fetching \"${1}\""
+    echo "as \"${2}\""
+    echo "with perms \"${3}\""
+  fi
+
   if [[ $use_curl == true ]]; then
     curl -sS -o "./${2}" "${1}"
   else
@@ -158,7 +162,11 @@ get_dir () {
       fi
       dl_url="https://raw.githubusercontent.com/${user}/${repo}/refs/heads/${ref}/${root}/${filepath}"
       perms="$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .mode')"
-      echo Fetching ${dl_url} to \"${dl_path}\"
+      if [[ $verbose == true ]]; then
+        echo Fetching \"${dl_url}\"
+        echo as \"${dl_path}\"
+        echo with perms \"${perms}\"
+      fi
       download_file "${dl_url}" "${dl_path}" "${perms}"
     done
   done
@@ -225,6 +233,9 @@ for arg in "$@"; do
         w)
           args+=" --wget"
           ;;
+        v)
+          args+=" --verbose"
+          ;;
       esac
     done
   else
@@ -247,6 +258,9 @@ for arg in $args; do
       ;;
     --*parse*)
       parse_only=true
+      ;;
+    --*verb*)
+      verbose=true
       ;;
     # --*wget*)
     #   use_curl=false
@@ -317,7 +331,7 @@ else
   fi
 fi
 
-if [[ $parse_only == true ]]; then
+if [[ $verbose == true ]] || [[ $parse_only == true ]]; then
   echo user=${user}
   echo repo=${repo}
   echo type=${type}
@@ -340,7 +354,6 @@ if [[ ${type} == tree ]]; then
     api_rq_url="${apiurl}/repos/${user}/${repo}"
     res="$(github_api $api_rq_url)"
     n_api_calls=$((n_api_calls+1))
-    echo $res > res.out
 
     ref="$(echo $res | jq -r '.default_branch' 2>/dev/null)"
 
