@@ -25,3 +25,11 @@ for c in all:
   with open('./special-chars/'+c, 'w') as file:
     file.write(randomword(16))
 
+root = './special-chars/dirs'
+makedirs(root)
+
+for c in all:
+  subdir = root + '/' + c
+  makedirs(subdir)
+  with open(subdir + "/testfile", 'w') as file:
+    file.write(randomword(16))
