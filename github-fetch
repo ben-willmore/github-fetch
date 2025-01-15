@@ -94,7 +94,7 @@ download_file () {
   if [[ $use_curl == true ]]; then
     curl -sS -o "./${2}" "${1}"
   else
-    url="$(echo ${2} | sed 's/#\#/')"
+    url="$(echo ${2} | sed 's/#/\#/')"
     wget -nv -O "./${url}" "${1}"
   fi
   if [[ $? != 0 ]]; then
@@ -141,8 +141,7 @@ get_dir () {
       root_head="$(echo ${root_tail} | cut -d/ -f1)"
       root_tail="${root_tail#$root_head}"
       root_head=$(urldecode "${root_head}")
-      export root_head="${root_head}"
-      tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
+      tree_url=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="tree" and .path==$x) | .url' 2>/dev/null)
       res="$(github_api $tree_url)"
       if [[ $? != 0 ]]; then
         raise_api_error "API call failed" $tree_url >&2
@@ -151,8 +150,7 @@ get_dir () {
     done
 
     root_head=$(urldecode "${root_tail#/}")
-    export root_head="${root_head}"
-    tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
+    tree_url=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="tree" and .path==$x) | .url' 2>/dev/null)
     res="$(github_api $tree_url?recursive=true)"
     if [[ $? != 0 ]]; then
       raise_api_error "API call failed" $tree_url?recursive=true >&2
@@ -160,14 +158,13 @@ get_dir () {
 
   fi
 
-  file_urls="$(echo $res | jq -r '.tree[] | select(.type=="blob") | .url' 2>/dev/null)"
+  file_urls=$(echo $res | jq -r '.tree[] | select(.type=="blob") | .url' 2>/dev/null)
   if [[ $? != 0 ]]; then
     raise_api_error "Could not parse API response" "${1}"
   fi
 
   for url in ${file_urls}; do
-    export url="${url}"
-    filepaths=$(echo $res | jq -r '.tree[] | select(.url==$ENV.url) | .path')
+    filepaths=$(echo $res | jq --arg x "${url}" -r '.tree[] | select(.url==$x) | .path')
     IFS=$'\n'
     for filepath in $filepaths; do
       dl_path="${filepath#$prefix}"
@@ -175,8 +172,7 @@ get_dir () {
       if [[ ! -z "${dl_dir}" ]]; then
         mkdir -p "${dl_dir}"
       fi
-      export filepath="${filepath}"
-      perms="$(echo $res | jq -r '.tree[] | select(.path==$ENV.filepath) | .mode')"
+      perms=$(echo $res | jq --arg x "${filepath}" -r '.tree[] | select(.path==$x) | .mode')
       dl_url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${root}/${filepath}"
       if [[ $verbose == true ]]; then
         echo Fetching \"${dl_url}\"
@@ -206,8 +202,7 @@ get_file () {
     root_head="$(echo ${root_tail} | cut -d/ -f1)"
     root_tail="${root_tail#$root_head/}"
     root_head=$(urldecode "${root_head}")
-    export root_head="${root_head}"    
-    tree_url="$(echo $res | jq -r '.tree[] | select(.type=="tree" and .path==$ENV.root_head) | .url' 2>/dev/null)"
+    tree_url=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="tree" and .path==$x) | .url' 2>/dev/null)
     res="$(github_api $tree_url)"
     if [[ $? != 0 ]]; then
       raise_api_error "API call failed" $tree_url >&2
@@ -216,9 +211,8 @@ get_file () {
   done
 
   root_head=$(urldecode "${root_tail#/}")
-  export root_head="${root_head}"
-  filepath="$(echo $res | jq -r '.tree[] | select(.type=="blob" and .path==$ENV.root_head) | .path' 2>/dev/null)"
-  perms="$(echo $res | jq -r '.tree[] | select(.type=="blob" and .path==$ENV.root_head) | .mode' 2>/dev/null)"
+  filepath=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="blob" and .path==$x) | .path' 2>/dev/null)
+  perms=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="blob" and .path==$x) | .mode' 2>/dev/null)
 
   url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${2}"
 
