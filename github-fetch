@@ -94,7 +94,8 @@ download_file () {
   if [[ $use_curl == true ]]; then
     curl -sS -o "./${2}" "${1}"
   else
-    wget -nv -O "./${2}" "${1}"
+    url="$(echo ${2} | sed 's/#\#/')"
+    wget -nv -O "./${url}" "${1}"
   fi
   if [[ $? != 0 ]]; then
     echo File download failed for URL:

@@ -34,7 +34,8 @@ test_file () {
 
 test_dir () {
   if [[ $(md5dir "${1}") != $(md5dir "${2}") ]]; then
-    echo Fail
+  echo $1 $2
+    echo Fail $(md5dir "${1}") $(md5dir "${2}") 
     exit 1
   fi
 }
@@ -60,80 +61,103 @@ git_checkout () {
   )
 }
 
-github_fetch="$(pwd)/github-fetch"
-echo $github_fetch
+initial_setup () {
+  github_fetch="$(pwd)/github-fetch"
 
-root_dir="$(pwd)"
-test_dir="$(pwd)/test.tmp"
-git_dir="$(pwd)/git.tmp"
-check_dir="$git_dir/test"
+  root_dir="$(pwd)"
+  test_dir="$(pwd)/test.tmp"
+  git_dir="$(pwd)/git.tmp"
+  check_dir="$git_dir/test"
 
-git clone https://github.com/ben-willmore/github-fetch $git_dir
+  rm -rf "${git_dir}"
+  git clone https://github.com/ben-willmore/github-fetch $git_dir
 
-# setup "Downloading single file to current directory"
-# git_checkout main
-# $github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three
-# test_file $test_dir/three $check_dir/subdir/three
-# teardown
+}
 
-# setup "Downloading single file to current directory - blocked, should fail"
-# git_checkout main
-# touch three
-# $github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three
-# test_fail
-# teardown
+final_cleanup () {
+  rm -rf ${test_dir}
+  rm -rf ${git_dir}
+}
 
-# setup "Downloading single file to alternate directory"
-# git_checkout main
-# mkdir ./alt_dir
-# $github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three "./alt_dir"
-# test_file ./alt_dir/three $check_dir/subdir/three
-# teardown
+initial_setup
 
-# setup "Downloading single file to alternate directory - blocked, should fail"
-# git_checkout main
-# mkdir ./alt_dir
-# touch ./alt_dir/three
-# $github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three "./alt_dir"
-# test_fail
-# teardown
+## single test
+setup "Downloading subdir to current directory"
+git_checkout main
+$github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
+test_dir ./test $check_dir
+teardown
 
-# setup "Downloading whole repo to current directory"
-# git_checkout main
-# $github_fetch https://github.com/ben-willmore/github-fetch
-# test_dir ./github-fetch/test $check_dir
-# teardown
+final_cleanup
 
-# setup "Downloading subdir to current directory"
-# git_checkout main
-# $github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
-# test_dir ./test $check_dir
-# # teardown
+exit 0
 
-# setup "Downloading subdir to current directory - blocked, should fail"
-# git_checkout main
-# touch test
-# $github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
-# test_fail
-# teardown
 
-# setup "Downloading single file to current directory -- alt branch"
-# git_checkout testbranch
-# $github_fetch https://github.com/ben-willmore/github-fetch/blob/testbranch/test/subdir/three
-# test_file $test_dir/three $check_dir/subdir/three
-# teardown
 
-# setup "Downloading subdir to current directory -- alt branch"
-# git_checkout testbranch
-# $github_fetch https://github.com/ben-willmore/github-fetch/tree/testbranch/test
-# test_dir ./test $check_dir
-# teardown
+setup "Downloading single file to current directory"
+git_checkout main
+$github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three
+test_file $test_dir/three $check_dir/subdir/three
+teardown
 
-# setup "Downloading whole repo to current directory -- alt branch"
-# git_checkout testbranch
-# $github_fetch https://github.com/ben-willmore/github-fetch/tree/testbranch
-# test_dir ./github-fetch/test $check_dir
-# teardown
+setup "Downloading single file to current directory - blocked, should fail"
+git_checkout main
+touch three
+$github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three
+test_fail
+teardown
+
+setup "Downloading single file to alternate directory"
+git_checkout main
+mkdir ./alt_dir
+$github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three "./alt_dir"
+test_file ./alt_dir/three $check_dir/subdir/three
+teardown
+
+setup "Downloading single file to alternate directory - blocked, should fail"
+git_checkout main
+mkdir ./alt_dir
+touch ./alt_dir/three
+$github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three "./alt_dir"
+test_fail
+teardown
+
+setup "Downloading whole repo to current directory"
+git_checkout main
+$github_fetch https://github.com/ben-willmore/github-fetch
+test_dir ./github-fetch/test $check_dir
+teardown
+
+setup "Downloading subdir to current directory"
+git_checkout main
+$github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
+test_dir ./test $check_dir
+teardown
+
+setup "Downloading subdir to current directory - blocked, should fail"
+git_checkout main
+touch test
+$github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
+test_fail
+teardown
+
+setup "Downloading single file to current directory -- alt branch"
+git_checkout testbranch
+$github_fetch https://github.com/ben-willmore/github-fetch/blob/testbranch/test/subdir/three
+test_file $test_dir/three $check_dir/subdir/three
+teardown
+
+setup "Downloading subdir to current directory -- alt branch"
+git_checkout testbranch
+$github_fetch https://github.com/ben-willmore/github-fetch/tree/testbranch/test
+test_dir ./test $check_dir
+teardown
+
+setup "Downloading whole repo to current directory -- alt branch"
+git_checkout testbranch
+$github_fetch https://github.com/ben-willmore/github-fetch/tree/testbranch
+test_dir ./github-fetch/test $check_dir
+teardown
 
 setup "Downloading single file to current directory -- specific commit"
 git_checkout b705c8521553926a84609816d3f5ed8814945aee
@@ -152,3 +176,5 @@ git_checkout b705c8521553926a84609816d3f5ed8814945aee
 $github_fetch https://github.com/ben-willmore/github-fetch/tree/b705c8521553926a84609816d3f5ed8814945aee
 test_dir ./github-fetch/test $check_dir
 teardown
+
+final_cleanup
