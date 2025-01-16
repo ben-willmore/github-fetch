@@ -82,17 +82,34 @@ final_cleanup () {
 initial_setup
 
 ## single test
-setup "Downloading subdir to current directory"
+
+setup "Downloading single file to current directory"
 git_checkout main
-$github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
-test_dir ./test $check_dir
+$github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three
+test_file $test_dir/three $check_dir/subdir/three
 teardown
+
+# setup "Downloading subdir to current directory"
+# git_checkout main
+# $github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
+# test_dir ./test $check_dir
+# teardown
 
 final_cleanup
 
 exit 0
 
+setup "Downloading single file to non-existent directory -- should fail"
+git_checkout main
+$github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three
+test_fail
+teardown
 
+setup "Downloading dir to non-existent directory -- should fail"
+git_checkout main
+$github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
+test_fail
+teardown
 
 setup "Downloading single file to current directory"
 git_checkout main
@@ -112,14 +129,6 @@ git_checkout main
 mkdir ./alt_dir
 $github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three "./alt_dir"
 test_file ./alt_dir/three $check_dir/subdir/three
-teardown
-
-setup "Downloading single file to alternate directory - blocked, should fail"
-git_checkout main
-mkdir ./alt_dir
-touch ./alt_dir/three
-$github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three "./alt_dir"
-test_fail
 teardown
 
 setup "Downloading whole repo to current directory"

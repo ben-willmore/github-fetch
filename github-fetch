@@ -7,20 +7,24 @@ apiurl=https://api.github.com
 LANG=C
 
 urlencode () {
-    local l=${#1}
-    for (( i = 0 ; i < l ; i++ )); do
-        local c=${1:i:1}
-        case "$c" in
-            [a-zA-Z0-9.~_-]) printf "$c" ;;
-            ' ') printf + ;;
-            *) printf '%%%.2X' "'$c"
-        esac
-    done
+  proto=$(echo "$1" | grep :// | sed -e's,^\(.*://\).*,\1,g')
+  printf "${proto}"
+  url="$(echo ${1/$proto/})"
+  local l=${#url}
+  for (( i = 0 ; i < l ; i++ )); do
+    local c=${url:i:1}
+    case "$c" in
+      [a-zA-Z0-9.~_-]) printf "$c" ;;
+      '/') printf / ;;
+      ' ') printf + ;;
+      *) printf '%%%.2X' "'$c"
+    esac
+  done
 }
 
 urldecode () {
-    local data=${1//+/ }
-    printf '%b' "${data//%/\\x}"
+  local data=${1//+/ }
+  printf '%b' "${data//%/\\x}"
 }
 
 github_api () {
@@ -112,14 +116,14 @@ download_file () {
 
 get_dir () {
   if [[ -z "${2}" ]]; then
-    dest_dir=$(urldecode "${repo}")
+    dest_dir="${repo}"
     prefix=
   else
-    base="$(basename ${2})"
-    dest_dir=$(urldecode "${base}")
+    base=$(basename "${2}")
+    dest_dir="${base}"
     prefix="${2}/"
   fi
-
+  echo ===$dest_dir===
   make_dir "${dest_dir}"
   cd "${dest_dir}"
 
@@ -143,7 +147,7 @@ get_dir () {
     while [[ "${root_tail}" =~ .*./.* ]]; do
       root_head="$(echo ${root_tail} | cut -d/ -f1)"
       root_tail="${root_tail#$root_head}"
-      root_head=$(urldecode "${root_head}")
+      # root_head="${root_head}")
       tree_url=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="tree" and .path==$x) | .url' 2>/dev/null)
       res="$(github_api $tree_url)"
       if [[ $? != 0 ]]; then
@@ -152,7 +156,7 @@ get_dir () {
 
     done
 
-    root_head=$(urldecode "${root_tail#/}")
+    root_head="${root_tail#/}"
     tree_url=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="tree" and .path==$x) | .url' 2>/dev/null)
     res="$(github_api $tree_url?recursive=true)"
     if [[ $? != 0 ]]; then
@@ -169,7 +173,9 @@ get_dir () {
   for url in ${file_urls}; do
     filepaths=$(echo $res | jq --arg x "${url}" -r '.tree[] | select(.url==$x) | .path')
     IFS=$'\n'
+    echo paths: $filepaths 
     for filepath in $filepaths; do
+      echo $filepath
       dl_path="${filepath#$prefix}"
       dl_dir=$(dirname "${dl_path}")
       if [[ ! -z "${dl_dir}" ]]; then
@@ -201,10 +207,12 @@ get_file () {
   fi
 
   root_tail="${2}"
+  echo rt $root_tail
   while [[ "${root_tail}" =~ .*./.* ]]; do
-    root_head="$(echo ${root_tail} | cut -d/ -f1)"
+    root_head=$(echo "${root_tail}" | cut -d/ -f1)
     root_tail="${root_tail#$root_head/}"
-    root_head=$(urldecode "${root_head}")
+    echo $root_head $root_tail
+    # root_head=$(urldecode "${root_head}")
     tree_url=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="tree" and .path==$x) | .url' 2>/dev/null)
     res="$(github_api $tree_url)"
     if [[ $? != 0 ]]; then
@@ -213,7 +221,8 @@ get_file () {
 
   done
 
-  root_head=$(urldecode "${root_tail#/}")
+  root_head="${root_tail#/}"
+  echo $root_head
   filepath=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="blob" and .path==$x) | .path' 2>/dev/null)
   perms=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="blob" and .path==$x) | .mode' 2>/dev/null)
 
@@ -338,6 +347,8 @@ fi
 # parse URL
 # e.g. https://github.com/ben-willmore/portmaster/tree/main/perfectdark
 
+input_url=$(urldecode "${input_url}")
+
 proto="$(echo $input_url | grep :// | sed -e's,^\(.*://\).*,\1,g')"
 url="$(echo ${input_url/$proto/})"
 
@@ -386,6 +397,10 @@ n_api_calls=0
 
 if [[ ! -z "${dest_dir}" ]]; then
   cd "${dest_dir}"
+  if [[ $? != 0 ]]; then
+    echo "Couldn't change dir to ${dest_dir}"
+    exit 12
+  fi
 fi
 
 if [[ -z ${ref} ]]; then
@@ -407,10 +422,13 @@ fi
 api_rq_url="${apiurl}/repos/${user}/${repo}/git/trees/${ref}"
 
 if [[ ${type} == tree ]]; then
+  echo --- "${api_rq_url}" "${root}"
+
   get_dir "${api_rq_url}" "${root}"
 
 elif [[ ${type} == blob ]]; then
-  target=$(urldecode "${root}")
+  target="${root}"
+  echo --- "${api_rq_url}" "${target}"
   get_file "${api_rq_url}" "${target}"
 
 fi
