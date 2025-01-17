@@ -81,33 +81,15 @@ final_cleanup () {
 
 initial_setup
 
-## single test
-
-setup "Downloading single file to current directory"
-git_checkout main
-$github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three
-test_file $test_dir/three $check_dir/subdir/three
-teardown
-
-# setup "Downloading subdir to current directory"
-# git_checkout main
-# $github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
-# test_dir ./test $check_dir
-# teardown
-
-final_cleanup
-
-exit 0
-
 setup "Downloading single file to non-existent directory -- should fail"
 git_checkout main
-$github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three
+$github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three nonexistent_dir
 test_fail
 teardown
 
 setup "Downloading dir to non-existent directory -- should fail"
 git_checkout main
-$github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
+$github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test nonexistent_dir
 test_fail
 teardown
 
