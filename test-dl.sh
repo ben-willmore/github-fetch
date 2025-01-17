@@ -8,8 +8,8 @@
 # * the remaining special chars -- *, ...?
 
 ignore_api_limit=false
-cache_flag=
-# cache_flag='--test'
+#cache_flag=
+cache_flag='--test'
 
 urldecode () {
   local data=${1//+/ }

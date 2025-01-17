@@ -48,12 +48,14 @@ github_api_nocache () {
   exit $code
 }
 
-script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-cache_dir=$(realpath "${script_dir}")/cache
-mkdir -p "${cache_dir}"
+if [[ "${use_cache}" == true ]]; then
+  script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+  cache_dir=$(realpath "${script_dir}")/cache
+  mkdir -p "${cache_dir}"
+fi
 
 github_api () {
-  if [[ $use_cache == true ]]; then
+  if [[ "${use_cache}" == true ]]; then
     cache_filename=${cache_dir}/$(echo $1 | tr  '/' '-') 
     if [[ -f "${cache_filename}" ]]; then
       echo found in cache: $1 >&2
