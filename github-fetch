@@ -1,7 +1,5 @@
 #!/bin/bash
 
-USE_CACHE=true
-
 ## functions
 
 apiurl=https://api.github.com
@@ -48,7 +46,7 @@ cache_dir=$(realpath "${script_dir}")/cache
 mkdir -p "${cache_dir}"
 
 github_api () {
-  if [[ $USE_CACHE == true ]]; then
+  if [[ $use_cache == true ]]; then
     cache_filename=${cache_dir}/$(echo $1 | tr  '/' '-') 
     if [[ -f "${cache_filename}" ]]; then
       echo found in cache: $1 >&2
@@ -184,7 +182,7 @@ get_dir () {
   fi
   echo ===$dest_dir===
   make_dir "${dest_dir}"
-  cd "${dest_dir}"
+  cd "./${dest_dir}"
 
   if [[ $n_api_calls == 0 ]]; then
     echo Base API URL: $1
@@ -319,6 +317,9 @@ for arg in "$@"; do
         v)
           args+=" --verbose"
           ;;
+        t)
+          args+=" --test"
+          ;;
       esac
     done
   else
@@ -344,6 +345,9 @@ for arg in $args; do
       ;;
     --*verb*)
       verbose=true
+      ;;
+    --*test*)
+      use_cache=true
       ;;
     # --*wget*)
     #   use_curl=false

@@ -2,13 +2,33 @@
 
 # need to git clone here to make sure checkout has right version of repo
 # add tests for:
-# different branches, commits, e.g.:
-# https://github.com/ben-willmore/PortMaster-New/tree/58e7be051e7b24740d82dd65a4ac837d3d416006/ports/hurrican
-# single files with pathological names
-# pathological paths as well as final names
-# unicode chars like tilde-n
-# permissions
-# symlinks
+# * unicode chars like tilde-n
+# * permissions (including directory permissions?)
+# * symlinks
+# * the remaining special chars -- *, ...?
+
+ignore_api_limit=false
+
+urldecode () {
+  local data=${1//+/ }
+  printf '%b' "${data//%/\\x}"
+}
+
+urlencode () {
+  proto=$(echo "$1" | grep :// | sed -e's,^\(.*://\).*,\1,g')
+  printf "${proto}"
+  url="$(echo ${1/$proto/})"
+  local l=${#url}
+  for (( i = 0 ; i < l ; i++ )); do
+    local c=${url:i:1}
+    case "$c" in
+      [a-zA-Z0-9.~_-]) printf "$c" ;;
+      '/') printf / ;;
+      ' ') printf + ;;
+      *) printf '%%%.2X' "'$c"
+    esac
+  done
+}
 
 md5file () {
     md5sum "${1}" | awk '{print $1}'
@@ -26,14 +46,14 @@ setup () {
 }
 
 test_file () {
-  if [[ $(md5file "${1}") != $(md5file "${2}") ]]; then
+  if [[ ! -f "${1}" ]] || [[ ! -f "${2}" ]] || [[ $(md5file "${1}") != $(md5file "${2}") ]]; then
     echo Fail
     exit 1
   fi
 }
 
 test_dir () {
-  if [[ $(md5dir "${1}") != $(md5dir "${2}") ]]; then
+  if [[ ! -d "${1}" ]] || [[ ! -d "${2}" ]] || [[ $(md5dir "${1}") != $(md5dir "${2}") ]]; then
   echo $1 $2
     echo Fail $(md5dir "${1}") $(md5dir "${2}") 
     exit 1
@@ -62,7 +82,7 @@ git_checkout () {
 }
 
 initial_setup () {
-  github_fetch="$(pwd)/github-fetch"
+  github_fetch="$(pwd)/github-fetch --test"
 
   root_dir="$(pwd)"
   test_dir="$(pwd)/test.tmp"
@@ -110,19 +130,19 @@ setup "Downloading single file to alternate directory"
 git_checkout main
 mkdir ./alt_dir
 $github_fetch https://github.com/ben-willmore/github-fetch/blob/main/test/subdir/three "./alt_dir"
-test_file ./alt_dir/three $check_dir/subdir/three
+test_file $test_dir/alt_dir/three $check_dir/subdir/three
 teardown
 
 setup "Downloading whole repo to current directory"
 git_checkout main
 $github_fetch https://github.com/ben-willmore/github-fetch
-test_dir ./github-fetch/test $check_dir
+test_dir $test_dir/github-fetch/test $check_dir
 teardown
 
 setup "Downloading subdir to current directory"
 git_checkout main
 $github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
-test_dir ./test $check_dir
+test_dir $test_dir/test $check_dir
 teardown
 
 setup "Downloading subdir to current directory - blocked, should fail"
@@ -141,13 +161,13 @@ teardown
 setup "Downloading subdir to current directory -- alt branch"
 git_checkout testbranch
 $github_fetch https://github.com/ben-willmore/github-fetch/tree/testbranch/test
-test_dir ./test $check_dir
+test_dir $test_dir/test $check_dir
 teardown
 
 setup "Downloading whole repo to current directory -- alt branch"
 git_checkout testbranch
 $github_fetch https://github.com/ben-willmore/github-fetch/tree/testbranch
-test_dir ./github-fetch/test $check_dir
+test_dir $test_dir/github-fetch/test $check_dir
 teardown
 
 setup "Downloading single file to current directory -- specific commit"
@@ -159,13 +179,64 @@ teardown
 setup "Downloading subdir to current directory -- specific commit"
 git_checkout b705c8521553926a84609816d3f5ed8814945aee
 $github_fetch https://github.com/ben-willmore/github-fetch/tree/b705c8521553926a84609816d3f5ed8814945aee/test
-test_dir ./test $check_dir
+test_dir $test_dir/test $check_dir
 teardown
 
 setup "Downloading whole repo to current directory -- specific commit"
 git_checkout b705c8521553926a84609816d3f5ed8814945aee
 $github_fetch https://github.com/ben-willmore/github-fetch/tree/b705c8521553926a84609816d3f5ed8814945aee
-test_dir ./github-fetch/test $check_dir
+test_dir $test_dir/github-fetch/test $check_dir
 teardown
+
+setup "Deep subdirectory"
+git_checkout 17defefbffd7b4a09a607e1997fb6602fd169456
+$github_fetch https://github.com/ben-willmore/github-fetch/tree/17defefbffd7b4a09a607e1997fb6602fd169456/test/subdir/subdir/subdir/subdir
+test_dir $test_dir/subdir $check_dir/subdir/subdir/subdir/subdir
+teardown
+
+# special chars -- some are missing, such as *
+chars='! %22 %23 %24 %25 %26 '"'"' ( ) %2B %2C - %3B %3C %3D %3E %40 %5D _ %60 %7B %7B %7C %7D %7F'
+
+base_url="https://github.com/ben-willmore/github-fetch/blob/main/test/special-chars/"
+for char in $chars; do
+  initial_setup
+  url="${base_url}${char}"
+  base=$(basename ${url})
+  base=$(urldecode ${base})
+  setup "Downloading file with special char \"${base}\" in filename"
+  git_checkout main
+  $github_fetch "${url}"
+  test_file "$test_dir/${base}" "$check_dir/special-chars/${base}"
+  teardown
+done
+
+if [[ $ignore_api_limit == true ]];; then
+  base_url="https://github.com/ben-willmore/github-fetch/tree/main/test/special-chars/dirs/"
+  for char in $chars; do
+    initial_setup
+    url="${base_url}${char}"
+    base=$(basename ${url})
+    base=$(urldecode ${base})
+    setup "Downloading dir with special char \"${base}\" in dirname"
+    git_checkout main
+    $github_fetch "${url}"
+    test_dir "$test_dir/${base}" "$check_dir/special-chars/dirs/${base}"
+    teardown
+  done
+
+  base_url="https://github.com/ben-willmore/github-fetch/blob/main/test/special-chars/dirs/"
+  for char in $chars; do
+    initial_setup
+    url="${base_url}${char}/testfile"
+    base=$(basename ${url})
+    base=$(urldecode ${base})
+    setup "Downloading file with special char \"${char}\" in dirname"
+    git_checkout main
+    $github_fetch "${url}"
+    cc=$(urldecode "${char}")
+    test_file "$test_dir/testfile" "$check_dir/special-chars/dirs/${cc}/testfile"
+    teardown
+  done
+fi
 
 final_cleanup
