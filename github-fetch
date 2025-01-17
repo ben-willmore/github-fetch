@@ -1,5 +1,9 @@
 #!/bin/bash
 
+script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+cache_dir=$(realpath "${script_dir}")/cache
+mkdir -p "${cache_dir}"
+
 ## functions
 
 apiurl=https://api.github.com
@@ -27,14 +31,31 @@ urldecode () {
   printf '%b' "${data//%/\\x}"
 }
 
+# github_api () {
+#   if [[ $use_curl == true ]]; then
+#     res=$(curl -sS $1)
+#     code=$?
+#   else
+#     res=$(wget -qO- $1)
+#     code=$?
+#   fi
+
+#   n_api_calls=$((n_api_calls+1))
+#   echo $res
+#   exit $code
+# }
+
 github_api () {
-  if [[ $use_curl == true ]]; then
-    res=$(curl -sS $1)
-    code=$?
+  cache_filename=${cache_dir}/$(echo $1 | tr  '/' '-') 
+  if [[ -f "${cache_filename}" ]]; then
+    echo found in cache: $1 >&2
+    res=$(cat "${cache_filename}")
   else
+    echo saving to cache: $1 >&2
     res=$(wget -qO- $1)
-    code=$?
+    echo $res > "${cache_filename}"
   fi
+  code=$?
 
   n_api_calls=$((n_api_calls+1))
   echo $res
@@ -114,6 +135,37 @@ download_file () {
   fi
 }
 
+dig_to_target () {
+    # $1 root API URL for the repo
+    # $2 path of target
+    # return API URL for target
+    url=$1
+    last_url=
+
+    bits=$(echo "${2}" | tr '/' '\n')
+
+    to_match=
+    while IFS= read -r bit; do
+      if [[ ${url} != ${last_url} ]]; then
+        res="$(github_api $url)"
+        if [[ $? != 0 ]]; then
+          raise_api_error "API call failed" $1 >&2
+        fi
+        last_url="${url}"
+      fi
+      bit=$(echo "${bit}" | tr -d '\n')
+      to_match+="${bit}"
+      url=$(echo $res | jq --arg x "${to_match}" -r '.tree[] | select(.path==$x) | .url' 2>/dev/null)
+      if [[ -z "${url}" ]]; then
+        to_match+='/'
+      else
+        to_match=
+      fi
+    done <<< "${bits}"
+
+    echo "${url}"
+}
+
 get_dir () {
   if [[ -z "${2}" ]]; then
     dest_dir="${repo}"
@@ -133,36 +185,14 @@ get_dir () {
   fi
 
   if [[ -z "${2}" ]]; then
-    res="$(github_api $1?recursive=true)"
-    if [[ $? != 0 ]]; then
-      raise_api_error "API call failed" $1?recursive=true >&2
-    fi
-
+    url="${1}"
   else
-    res="$(github_api $1)"
-    if [[ $? != 0 ]]; then
-      raise_api_error "API call failed" $1 >&2
-    fi
-    root_tail="${2}"
-    while [[ "${root_tail}" =~ .*./.* ]]; do
-      root_head="$(echo ${root_tail} | cut -d/ -f1)"
-      root_tail="${root_tail#$root_head}"
-      # root_head="${root_head}")
-      tree_url=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="tree" and .path==$x) | .url' 2>/dev/null)
-      res="$(github_api $tree_url)"
-      if [[ $? != 0 ]]; then
-        raise_api_error "API call failed" $tree_url >&2
-      fi
+    url=$(dig_to_target "${1}" "${2}")
+  fi
 
-    done
-
-    root_head="${root_tail#/}"
-    tree_url=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="tree" and .path==$x) | .url' 2>/dev/null)
-    res="$(github_api $tree_url?recursive=true)"
-    if [[ $? != 0 ]]; then
-      raise_api_error "API call failed" $tree_url?recursive=true >&2
-    fi
-
+  res="$(github_api $url?recursive=true)"
+  if [[ $? != 0 ]]; then
+    raise_api_error "API call failed" $url?recursive=true >&2
   fi
 
   file_urls=$(echo $res | jq -r '.tree[] | select(.type=="blob") | .url' 2>/dev/null)
@@ -201,30 +231,25 @@ get_file () {
     echo
   fi
 
-  res="$(github_api $1)"
-  if [[ $? != 0 ]]; then
-    raise_api_error "API call failed" $1 >&2
+  bits=$(echo "${2}" | tr '/' '\n')
+  n_bits=$(echo "${bits}" | wc -l)
+ 
+  if [[ ${n_bits} == 1 ]]; then
+    url="${1}"
+    base="${2}" 
+  else
+    subdir=$(dirname "${2}")
+    url=$(dig_to_target "${1}" "${subdir}")
+    base=$(basename "${2}")
   fi
 
-  root_tail="${2}"
-  echo rt $root_tail
-  while [[ "${root_tail}" =~ .*./.* ]]; do
-    root_head=$(echo "${root_tail}" | cut -d/ -f1)
-    root_tail="${root_tail#$root_head/}"
-    echo $root_head $root_tail
-    # root_head=$(urldecode "${root_head}")
-    tree_url=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="tree" and .path==$x) | .url' 2>/dev/null)
-    res="$(github_api $tree_url)"
-    if [[ $? != 0 ]]; then
-      raise_api_error "API call failed" $tree_url >&2
-    fi
+  res="$(github_api $url)"
+  if [[ $? != 0 ]]; then
+    raise_api_error "API call failed" $url >&2
+  fi
 
-  done
-
-  root_head="${root_tail#/}"
-  echo $root_head
-  filepath=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="blob" and .path==$x) | .path' 2>/dev/null)
-  perms=$(echo $res | jq --arg x "${root_head}" -r '.tree[] | select(.type=="blob" and .path==$x) | .mode' 2>/dev/null)
+  filepath=$(echo $res | jq --arg x "${base}" -r '.tree[] | select(.type=="blob" and .path==$x) | .path' 2>/dev/null)
+  perms=$(echo $res | jq --arg x "${base}" -r '.tree[] | select(.type=="blob" and .path==$x) | .mode' 2>/dev/null)
 
   url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${2}"
 
