@@ -48,12 +48,6 @@ github_api_nocache () {
   exit $code
 }
 
-if [[ "${use_cache}" == true ]]; then
-  script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-  cache_dir=$(realpath "${script_dir}")/cache
-  mkdir -p "${cache_dir}"
-fi
-
 github_api () {
   if [[ "${use_cache}" == true ]]; then
     cache_filename=${cache_dir}/$(echo $1 | tr  '/' '-') 
@@ -397,6 +391,14 @@ if [[ -z $which_wget ]]; then
   echo Error: wget is not available
   echo
   exit 8
+fi
+
+# cache setup
+if [[ "${use_cache}" == true ]]; then
+  echo kjkej
+  script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+  cache_dir=$(realpath "${script_dir}")/cache
+  mkdir -p "${cache_dir}"
 fi
 
 # parse URL
