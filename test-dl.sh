@@ -8,6 +8,8 @@
 # * the remaining special chars -- *, ...?
 
 ignore_api_limit=false
+cache_flag=
+# cache_flag='--test'
 
 urldecode () {
   local data=${1//+/ }
@@ -82,7 +84,7 @@ git_checkout () {
 }
 
 initial_setup () {
-  github_fetch="$(pwd)/github-fetch --test"
+  github_fetch="$(pwd)/github-fetch $cache_flag"
 
   root_dir="$(pwd)"
   test_dir="$(pwd)/test.tmp"

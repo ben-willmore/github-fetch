@@ -218,20 +218,29 @@ get_dir () {
     IFS=$'\n'
     echo paths: $filepaths 
     for filepath in $filepaths; do
-      echo $filepath
+      perms=$(echo $res | jq --arg x "${filepath}" -r '.tree[] | select(.path==$x) | .mode')
       dl_path="${filepath#$prefix}"
       dl_dir=$(dirname "${dl_path}")
       if [[ ! -z "${dl_dir}" ]]; then
         mkdir -p "${dl_dir}"
       fi
-      perms=$(echo $res | jq --arg x "${filepath}" -r '.tree[] | select(.path==$x) | .mode')
       dl_url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${root}/${filepath}"
       if [[ $verbose == true ]]; then
         echo Fetching \"${dl_url}\"
         echo as \"${dl_path}\"
         echo with perms \"${perms}\"
       fi
-      download_file "${dl_url}" "${dl_path}" "${perms}"
+      if [[ "${perms}" == "120000" ]]; then
+        # symlink
+        # https://unix.stackexchange.com/questions/193465/what-file-mode-is-a-symlink
+        download_file "${dl_url}" "${dl_path}"
+        target=$(cat "${dl_path}")
+        rm -r "${dl_path}"
+        ln -s "${target}" "${dl_path}"
+      else
+        # regular file
+        download_file "${dl_url}" "${dl_path}" "${perms}"
+      fi
     done
   done
 
