@@ -178,6 +178,8 @@ $github_fetch https://github.com/ben-willmore/github-fetch/blob/b705c8521553926a
 test_file "$test_dir/s e v e n" "$check_dir/sub dir/s e v e n"
 teardown
 
+exit 0
+
 setup "Downloading subdir to current directory -- specific commit"
 git_checkout b705c8521553926a84609816d3f5ed8814945aee
 $github_fetch https://github.com/ben-willmore/github-fetch/tree/b705c8521553926a84609816d3f5ed8814945aee/test

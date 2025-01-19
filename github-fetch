@@ -127,11 +127,11 @@ download_file () {
   if [[ $use_curl == true ]]; then
     curl -sS -o "./${2}" "${1}"
   else
-    encoded_url=$(urlencode "${url}")
-    # url="$(echo ${1} | sed 's/#/%23/')"
-    # url="$(echo ${url} | sed 's/\[/%5C/')"
-    # url="$(echo ${url} | sed 's/\]/%5D/')"
-    # url="$(echo ${url} | sed 's/?/%7F/')"
+    # encoded_url=$(urlencode "${1}")
+    url="$(echo ${1} | sed 's/#/%23/')"
+    url="$(echo ${url} | sed 's/\[/%5C/')"
+    url="$(echo ${url} | sed 's/\]/%5D/')"
+    encoded_url="$(echo ${url} | sed 's/?/%7F/')"
     wget -nv -O "./${2}" "${encoded_url}"
   fi
   if [[ $? != 0 ]]; then
@@ -178,10 +178,12 @@ dig_to_target () {
 get_dir () {
   if [[ -z "${2}" ]]; then
     dest_dir="${repo}"
+    root_slash=
     prefix=
   else
     base=$(basename "${2}")
     dest_dir="${base}"
+    root_slash=/
     prefix="${2}/"
   fi
   echo ===$dest_dir===
@@ -220,7 +222,8 @@ get_dir () {
       if [[ ! -z "${dl_dir}" ]]; then
         mkdir -p "${dl_dir}"
       fi
-      dl_url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${root}/${filepath}"
+      dl_url="https://raw.githubusercontent.com/${user}/${repo}/${ref}${root_slash}${root}/${filepath}"
+      echo dl:$dl_url
       if [[ $verbose == true ]]; then
         echo Fetching \"${dl_url}\"
         echo as \"${dl_path}\"
