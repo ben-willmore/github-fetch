@@ -1,11 +1,13 @@
 #!/bin/bash
 
-# todo : get rid of this junk
-#    url="$(echo ${1} | sed 's/#/%23/')"
-#    url="$(echo ${url} | sed 's/\[/%5C/')"
-#    url="$(echo ${url} | sed 's/\]/%5D/')"
-#    url="$(echo ${url} | sed 's/?/%7F/')"
+# todo :
+# directory permissions
 # remaining 3? pathological characters
+# add tests for:
+# * unicode chars like tilde-n
+# * permissions (including directory permissions?)
+# * symlinks, files within a symlinked dir
+# * the remaining special chars -- *, ...?
 
 ## functions
 
@@ -13,18 +15,35 @@ apiurl=https://api.github.com
 
 LANG=C
 
+# https://www.baeldung.com/linux/uri-encode-curl
+# +-------------------------------+
+# | Char | PEChar | Char | PEChar |
+# |------+--------+------+--------|
+# | :    | %3A    | &    | %26    |
+# | /    | %2F    | '    | %27    |
+# | ?    | %3F    | (    | %28    |
+# | #    | %23    | )    | %29    |
+# | [    | %5B    | *    | %2A    |
+# | ]    | %5D    | +    | %2B    |
+# | @    | %40    | ,    | %2C    |
+# | !    | %21    | ;    | %3B    |
+# | $    | %24    | =    | %3D    |
+# | %    | %25    | ' '  | %20    |
+# +-------------------------------+
+
 urlencode () {
   proto=$(echo "$1" | grep :// | sed -e's,^\(.*://\).*,\1,g')
-  printf "${proto}"
   url="$(echo ${1/$proto/})"
+  printf "${proto}"
   local l=${#url}
   for (( i = 0 ; i < l ; i++ )); do
     local c=${url:i:1}
     case "$c" in
-      [a-zA-Z0-9.~_-]) printf "$c" ;;
-      '/') printf / ;;
-      ' ') printf + ;;
-      *) printf '%%%.2X' "'$c"
+      # / is missing, becaue that would also translate the separators. Probably we should really
+      # separate out the bits of the URL and encode each one. I'm not sure it makes a difference
+      # unless you can have / in a git filename. Maybe on windows?
+      [:?\#\[\]@!$%\&\'\(\)\*\+\,\;=\ ]) printf '%%%.2X' "'$c" ;;
+      *) printf "$c" ;;
     esac
   done
 }
@@ -35,13 +54,8 @@ urldecode () {
 }
 
 github_api_nocache () {
-  if [[ $use_curl == true ]]; then
-    res=$(curl -sS $1)
-    code=$?
-  else
-    res=$(wget -qO- $1)
-    code=$?
-  fi
+  res=$(wget -qO- $1)
+  code=$?
 
   n_api_calls=$((n_api_calls+1))
   echo $res
@@ -52,10 +66,10 @@ github_api () {
   if [[ "${use_cache}" == true ]]; then
     cache_filename=${cache_dir}/$(echo $1 | tr  '/' '-') 
     if [[ -f "${cache_filename}" ]]; then
-      echo found in cache: $1 >&2
+      echo Found in cache: $1 >&2
       res=$(cat "${cache_filename}")
     else
-      echo saving to cache: $1 >&2
+      echo Saving to cache: $1 >&2
       res=$(wget -qO- $1)
       code=$?
       echo $res > "${cache_filename}"
@@ -124,16 +138,12 @@ download_file () {
     echo "with perms \"${3}\""
   fi
 
-  if [[ $use_curl == true ]]; then
-    curl -sS -o "./${2}" "${1}"
-  else
-    # encoded_url=$(urlencode "${1}")
-    url="$(echo ${1} | sed 's/#/%23/')"
-    url="$(echo ${url} | sed 's/\[/%5C/')"
-    url="$(echo ${url} | sed 's/\]/%5D/')"
-    encoded_url="$(echo ${url} | sed 's/?/%7F/')"
-    wget -nv -O "./${2}" "${encoded_url}"
+  encoded_url=$(urlencode "${1}")
+  if [[ "${verbose}" == true ]]; then
+    echo "Encoded URL: ${encoded_url}"
   fi
+  wget -nv -O "./${2}" "${encoded_url}"
+
   if [[ $? != 0 ]]; then
     echo File download failed for URL:
     echo "${1}"
@@ -148,6 +158,7 @@ dig_to_target () {
     # $1 root API URL for the repo
     # $2 path of target
     # return API URL for target
+
     url=$1
     last_url=
 
@@ -176,6 +187,11 @@ dig_to_target () {
 }
 
 get_dir () {
+  if [[ "${verbose}" == true ]]; then
+    echo "Getting dir ${2}"
+    echo "Base API URL: ${1}"
+  fi
+
   if [[ -z "${2}" ]]; then
     dest_dir="${repo}"
     root_slash=
@@ -186,18 +202,16 @@ get_dir () {
     root_slash=/
     prefix="${2}/"
   fi
-  echo ===$dest_dir===
+
   make_dir "${dest_dir}"
   cd "./${dest_dir}"
-
-  if [[ $n_api_calls == 0 ]]; then
-    echo Base API URL: $1
-    echo
-  fi
 
   if [[ -z "${2}" ]]; then
     url="${1}"
   else
+    if [[ "${verbose}" == true ]]; then
+      echo "Digging from ${1} to ${2}"
+    fi
     url=$(dig_to_target "${1}" "${2}")
   fi
 
@@ -214,7 +228,7 @@ get_dir () {
   for url in ${file_urls}; do
     filepaths=$(echo $res | jq --arg x "${url}" -r '.tree[] | select(.url==$x) | .path')
     IFS=$'\n'
-    echo paths: $filepaths 
+
     for filepath in $filepaths; do
       perms=$(echo $res | jq --arg x "${filepath}" -r '.tree[] | select(.path==$x) | .mode')
       dl_path="${filepath#$prefix}"
@@ -223,7 +237,7 @@ get_dir () {
         mkdir -p "${dl_dir}"
       fi
       dl_url="https://raw.githubusercontent.com/${user}/${repo}/${ref}${root_slash}${root}/${filepath}"
-      echo dl:$dl_url
+
       if [[ $verbose == true ]]; then
         echo Fetching \"${dl_url}\"
         echo as \"${dl_path}\"
@@ -247,9 +261,9 @@ get_dir () {
 }
 
 get_file () {
-  if [[ $n_api_calls == 0 ]]; then
-    echo Base API URL: $1
-    echo
+  if [[ "${verbose}" == true ]]; then
+    echo "Getting file ${2}"
+    echo "Base API URL: ${1}"
   fi
 
   bits=$(echo "${2}" | tr '/' '\n')
@@ -260,6 +274,10 @@ get_file () {
     base="${2}" 
   else
     subdir=$(dirname "${2}")
+    if [[ "${verbose}" == true ]]; then
+      echo "Digging from ${1} to ${2}"
+    fi
+
     url=$(dig_to_target "${1}" "${subdir}")
     base=$(basename "${2}")
   fi
@@ -279,8 +297,10 @@ get_file () {
     echo
     exit 3
   fi
-
-  echo "Fetching ${url} to ${filepath} with perms ${perms}"
+  
+  if [[ "${verbose}" == true ]]; then
+    echo "Fetching file ${url} to ${filepath} with perms ${perms}"
+  fi
   download_file "${url}" "${filepath}" "${perms}"
 }
 
@@ -324,9 +344,6 @@ for arg in "$@"; do
         p)
           args+=" --parse-only"
           ;;
-        c)
-          args+=" --curl"
-          ;;
         w)
           args+=" --wget"
           ;;
@@ -347,8 +364,6 @@ for arg in "$@"; do
   fi
 done
 
-use_curl=false
-
 for arg in $args; do
   case $arg in
     --*limit*)
@@ -365,9 +380,6 @@ for arg in $args; do
     --*test*)
       use_cache=true
       ;;
-    # --*wget*)
-    #   use_curl=false
-    #   ;; 
   esac
 done
 
@@ -377,18 +389,7 @@ if [[ -z $input_url ]]; then
   exit 7
 fi
 
-# which_curl=$(which curl)
 which_wget=$(which wget)
-
-# if [[ -z $which_curl ]] && [[ -z $which_wget ]]; then
-#   echo Error: Neither curl nor wget is available
-#   echo
-#   exit 8
-# elif [[ $use_curl == true ]] && [[ -z $which_curl ]]; then
-#   use_curl=false
-# elif [[ $use_curl == false ]] && [[ -z $which_curl ]]; then
-#   use_curl=true
-# fi
 
 if [[ -z $which_wget ]]; then
   echo Error: wget is not available
@@ -398,7 +399,10 @@ fi
 
 # cache setup
 if [[ "${use_cache}" == true ]]; then
-  echo kjkej
+  if [[ "${verbose}" == true ]]; then
+    echo "Setting up cache"
+  fi
+
   script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
   cache_dir=$(realpath "${script_dir}")/cache
   mkdir -p "${cache_dir}"
@@ -444,12 +448,16 @@ else
   fi
 fi
 
-if [[ $verbose == true ]] || [[ $parse_only == true ]]; then
+if [[ "${verbose}" == true ]] || [[ "${parse_only}" == true ]]; then
+  echo Parsed parameters:
   echo user=${user}
   echo repo=${repo}
   echo type=${type}
   echo ref=${ref}
   echo root=${root}
+fi
+
+if [[ "${parse_only}" == true ]]; then
   exit 0
 fi
 
@@ -476,19 +484,16 @@ if [[ -z ${ref} ]]; then
     raise_api_error "Could not parse API response" "$api_rq_url" >&2
   fi
 
-  echo Using default branch: $ref
+  echo "Using default branch: ${ref}"
 fi
 
 api_rq_url="${apiurl}/repos/${user}/${repo}/git/trees/${ref}"
 
 if [[ ${type} == tree ]]; then
-  echo --- "${api_rq_url}" "${root}"
-
   get_dir "${api_rq_url}" "${root}"
 
 elif [[ ${type} == blob ]]; then
   target="${root}"
-  echo --- "${api_rq_url}" "${target}"
   get_file "${api_rq_url}" "${target}"
 
 fi
