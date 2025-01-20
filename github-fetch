@@ -255,6 +255,8 @@ get_dir () {
 
   done < github-fetch-tmp-catalog.txt
 
+  rm github-fetch-tmp-catalog.txt
+
   cd ..
 }
 
