@@ -40,7 +40,7 @@ urlencode () {
       # / is missing, becaue that would also translate the separators. Probably we should really
       # separate out the bits of the URL and encode each one. I'm not sure it makes a difference
       # unless you can have / in a git filename. Maybe on windows?
-      [:?\#\[\]@!$%\&\'\(\)\*\+\,\;=\ ]) printf '%%%.2X' "'$c" ;;
+      [:?\#\[\]@!$%\&\'\(\)\*\+\,\;=\ {}]) printf '%%%.2X' "'$c" ;;
       *) printf "$c" ;;
     esac
   done
@@ -130,17 +130,16 @@ make_dir () {
 }
 
 download_file () {
-  if [[ $verbose == true ]]; then
-    echo "Fetching \"${1}\""
-    echo "as \"${2}\""
-    echo "with perms \"${3}\""
-  fi
+  # if [[ $verbose == true ]]; then
+  #   echo "Fetching \"${1}\" as \"${2}\" with perms \"${3}\""
+  # fi
 
   encoded_url=$(urlencode "${1}")
   if [[ "${verbose}" == true ]]; then
     echo "Encoded URL: ${encoded_url}"
   fi
   wget -nv -O "./${2}" "${encoded_url}"
+  # curl -sS -o "./${2}" "${encoded_url}"
 
   if [[ $? != 0 ]]; then
     echo File download failed for URL:
@@ -224,10 +223,15 @@ get_dir () {
   fi
 
   for url in ${file_urls}; do
+    echo URL:$url
     filepaths=$(echo $res | jq --arg x "${url}" -r '.tree[] | select(.url==$x) | .path')
     IFS=$'\n'
 
     for filepath in $filepaths; do
+      if [[ $verbose == true ]]; then
+        echo "== Path: ${filepath}"
+      fi
+
       perms=$(echo $res | jq --arg x "${filepath}" -r '.tree[] | select(.path==$x) | .mode')
       dl_path="${filepath#$prefix}"
       dl_dir=$(dirname "${dl_path}")
@@ -237,9 +241,7 @@ get_dir () {
       dl_url="https://raw.githubusercontent.com/${user}/${repo}/${ref}${root_slash}${root}/${filepath}"
 
       if [[ $verbose == true ]]; then
-        echo Fetching \"${dl_url}\"
-        echo as \"${dl_path}\"
-        echo with perms \"${perms}\"
+        echo "Fetching \"${dl_url}\" as \"${dl_path}\" with perms \"${perms}\"..."
       fi
       if [[ "${perms}" == "120000" ]]; then
         # symlink
