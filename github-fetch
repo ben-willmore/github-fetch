@@ -1,13 +1,11 @@
 #!/bin/bash
 
 # todo :
-# directory permissions
-# remaining 3? pathological characters
+# either handle * in filenames or generate an error when it appears
 # add tests for:
 # * unicode chars like tilde-n
-# * permissions (including directory permissions?)
+# * permissions
 # * symlinks, files within a symlinked dir
-# * the remaining special chars -- *, ...?
 
 ## functions
 
