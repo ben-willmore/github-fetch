@@ -4,9 +4,9 @@ import string
 from os import makedirs
 from random import choice
 
-all = ''.join([chr(i) for i in range(33,128)])
+all = ''.join([chr(i) for i in range(32,127)])
 
-for s in ':?[\^~./':
+for s in '/*':
   all = ''.join(all.split(s))
 
 for s in string.ascii_letters+string.digits:
@@ -15,21 +15,17 @@ for s in string.ascii_letters+string.digits:
 print(len(all))
 print(all)
 
-def randomword(length):
-   letters = string.ascii_lowercase
-   return ''.join(choice(letters) for i in range(length))
-
 makedirs('./special-chars')
 
 for c in all:
-  with open('./special-chars/'+c, 'w') as file:
-    file.write(randomword(16))
+  with open('./special-chars/file-'+c, 'w') as file:
+    file.write('file-'+c)
 
 root = './special-chars/dirs'
 makedirs(root)
 
 for c in all:
-  subdir = root + '/' + c
+  subdir = root + '/dir-' + c
   makedirs(subdir)
   with open(subdir + "/testfile", 'w') as file:
-    file.write(randomword(16))
+    file.write('dir-'+c)
