@@ -33,14 +33,15 @@ urlencode () {
   proto=$(echo "$1" | grep :// | sed -e's,^\(.*://\).*,\1,g')
   url="$(echo ${1/$proto/})"
   printf "${proto}"
-  local l=${#url}
+  local l="${#url}"
   for (( i = 0 ; i < l ; i++ )); do
-    local c=${url:i:1}
+    local c="${url:i:1}"
     case "$c" in
       # / is missing, becaue that would also translate the separators. Probably we should really
       # separate out the bits of the URL and encode each one. I'm not sure it makes a difference
       # unless you can have / in a git filename. Maybe on windows?
-      [:?\#\[\]@!$%\&\'\(\)\*\+\,\;=\ {}]) printf '%%%.2X' "'$c" ;;
+      [:?\#\[\]@!$%\&\'\(\)\*\+\,\;={}\ ]) printf '%%%.2X' "'$c" ;;
+      # " ") printf '\%20' ;;
       *) printf "$c" ;;
     esac
   done
@@ -134,7 +135,7 @@ download_file () {
   #   echo "Fetching \"${1}\" as \"${2}\" with perms \"${3}\""
   # fi
 
-  encoded_url=$(urlencode "${1}")
+  IFS= encoded_url=$(urlencode "${1}")
   if [[ "${verbose}" == true ]]; then
     echo "Encoded URL: ${encoded_url}"
   fi
@@ -217,45 +218,42 @@ get_dir () {
     raise_api_error "API call failed" $url?recursive=true >&2
   fi
 
-  file_urls=$(echo $res | jq -r '.tree[] | select(.type=="blob") | .url' 2>/dev/null)
   if [[ $? != 0 ]]; then
     raise_api_error "Could not parse API response" "${1}"
   fi
 
-  for url in ${file_urls}; do
-    echo URL:$url
-    filepaths=$(echo $res | jq --arg x "${url}" -r '.tree[] | select(.url==$x) | .path')
-    IFS=$'\n'
+  echo $res | jq -r '.tree[] | select(.type=="blob") | .path' >> github-fetch-tmp-catalog.txt
 
-    for filepath in $filepaths; do
-      if [[ $verbose == true ]]; then
-        echo "== Path: ${filepath}"
-      fi
+  while IFS= read -r filepath; do
 
-      perms=$(echo $res | jq --arg x "${filepath}" -r '.tree[] | select(.path==$x) | .mode')
-      dl_path="${filepath#$prefix}"
-      dl_dir=$(dirname "${dl_path}")
-      if [[ ! -z "${dl_dir}" ]]; then
-        mkdir -p "${dl_dir}"
-      fi
-      dl_url="https://raw.githubusercontent.com/${user}/${repo}/${ref}${root_slash}${root}/${filepath}"
+    if [[ $verbose == true ]]; then
+      echo "== Path: ${filepath}=="
+    fi
 
-      if [[ $verbose == true ]]; then
-        echo "Fetching \"${dl_url}\" as \"${dl_path}\" with perms \"${perms}\"..."
-      fi
-      if [[ "${perms}" == "120000" ]]; then
-        # symlink
-        # https://unix.stackexchange.com/questions/193465/what-file-mode-is-a-symlink
-        download_file "${dl_url}" "${dl_path}"
-        target=$(cat "${dl_path}")
-        rm -r "${dl_path}"
-        ln -s "${target}" "${dl_path}"
-      else
-        # regular file
-        download_file "${dl_url}" "${dl_path}" "${perms}"
-      fi
-    done
-  done
+    perms=$(echo $res | jq --arg x "${filepath}" -r '.tree[] | select(.path==$x) | .mode')
+    dl_path="${filepath#$prefix}"
+    dl_dir=$(dirname "${dl_path}")
+    if [[ ! -z "${dl_dir}" ]]; then
+      mkdir -p "${dl_dir}"
+    fi
+    dl_url="https://raw.githubusercontent.com/${user}/${repo}/${ref}${root_slash}${root}/${filepath}"
+
+    if [[ $verbose == true ]]; then
+      echo "Fetching \"${dl_url}\" as \"${dl_path}\" with perms \"${perms}\"..."
+    fi
+    if [[ "${perms}" == "120000" ]]; then
+      # symlink
+      # https://unix.stackexchange.com/questions/193465/what-file-mode-is-a-symlink
+      download_file "${dl_url}" "${dl_path}"
+      target=$(cat "${dl_path}")
+      rm -r "${dl_path}"
+      ln -s "${target}" "${dl_path}"
+    else
+      # regular file
+      download_file "${dl_url}" "${dl_path}" "${perms}"
+    fi
+
+  done < github-fetch-tmp-catalog.txt
 
   cd ..
 }
