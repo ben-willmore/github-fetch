@@ -9,7 +9,7 @@
 
 ignore_api_limit=false
 #cache_flag=
-cache_flag='--test'
+cache_flag='--test --curl'
 
 urldecode () {
   local data=${1//+/ }

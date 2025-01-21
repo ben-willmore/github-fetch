@@ -6,7 +6,7 @@ from random import choice
 
 all = ''.join([chr(i) for i in range(32,127)])
 
-for s in '/*':
+for s in '/':
   all = ''.join(all.split(s))
 
 for s in string.ascii_letters+string.digits:
