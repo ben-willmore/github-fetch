@@ -381,6 +381,7 @@ for arg in $args; do
       ;;
     --*test*)
       use_cache=true
+      verbose=true
       ;;
   esac
 done

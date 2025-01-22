@@ -238,7 +238,7 @@ while IFS= read -r file; do
 done < test.tmpfile
 rm test.tmpfile
 
-if [[ 0 == 0 ]]; then #[[ $ignore_api_limit == true ]];; then
+if [[ 1 == 1 ]]; then #[[ $ignore_api_limit == true ]]; then
   base_url="https://github.com/ben-willmore/github-fetch/tree/main/test/special-chars/dirs/"
   find $check_dir/special-chars/dirs -mindepth 1 -maxdepth 1 -type d > test.tmpfile
 
@@ -248,7 +248,6 @@ if [[ 0 == 0 ]]; then #[[ $ignore_api_limit == true ]];; then
     enc="${enc:1}"
     enc="${enc%?}"
     url="${base_url}${enc}"
-    echo --$url--
     setup "Downloading dir \"${dirname}\" with special char in dirname"
     $github_fetch "${url}"
     test_dir "$test_dir/${dirname}" "$check_dir/special-chars/dirs/${dirname}"
@@ -265,12 +264,12 @@ if [[ 0 == 0 ]]; then #[[ $ignore_api_limit == true ]];; then
     enc="${enc:1}"
     enc="${enc%?}"
     url="${base_url}${enc}/testfile"
-    echo --$url--
     setup "Downloading file from \"${dirname}\" with special char in dirname"
     $github_fetch "${url}"
     test_file "$test_dir/testfile" "$check_dir/special-chars/dirs/${dirname}/testfile"
     teardown
   done < test.tmpfile
+  rm test.tmpfile
 
 fi
 
