@@ -261,7 +261,7 @@ get_dir () {
 
 get_file () {
   if [[ "${verbose}" == true ]]; then
-    echo "Getting file ${2}"
+    echo "Getting file \"${2}\""
     echo "Base API URL: ${1}"
   fi
 
@@ -290,7 +290,6 @@ get_file () {
   perms=$(echo $res | jq --arg x "${base}" -r '.tree[] | select(.type=="blob" and .path==$x) | .mode' 2>/dev/null)
 
   url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${2}"
-
   if [[ -e "${filepath}" ]]; then
     echo "Error: ${filename} already exists; can't create file"
     echo
@@ -430,8 +429,9 @@ fi
 
 # parse URL
 # e.g. https://github.com/ben-willmore/portmaster/tree/main/perfectdark
-
-input_url=$(urldecode "${input_url}")
+#echo ii--$input_url--ii
+#input_url=$(urldecode "${input_url}")
+#echo ii--$input_url--ii
 
 proto="$(echo $input_url | grep :// | sed -e's,^\(.*://\).*,\1,g')"
 url="$(echo ${input_url/$proto/})"
@@ -463,7 +463,7 @@ else
     root=
     echo "Fetching ${user}:${repo}@${ref} (whole repo)"
   else
-    root="$(echo ${url/$ref\//})"
+    root=$(urldecode "${url/$ref\//}")
     echo "Fetching ${user}:${repo}/${root}@${ref}"
   fi
 fi
