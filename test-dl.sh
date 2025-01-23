@@ -226,11 +226,10 @@ git_checkout main
 
 find $check_dir/special-chars -maxdepth 1 -type f > test.tmpfile
 while IFS= read -r file; do
-  file=$(basename "${file}")
-  enc=$(urlencode "-${file}-")
-  enc="${enc:1}"
-  enc="${enc%?}"
-  url="${base_url}${enc}"
+  set -f
+  file=$(IFS= basename "${file}")
+  url=${base_url}$(IFS= urlencode "${file}")
+  set +f
   setup "Downloading file \"${file}\" with special char in filename"
   $github_fetch "${url}"
   test_file "$test_dir/${file}" "$check_dir/special-chars/${file}"
@@ -243,11 +242,10 @@ if [[ 1 == 1 ]]; then #[[ $ignore_api_limit == true ]]; then
   find $check_dir/special-chars/dirs -mindepth 1 -maxdepth 1 -type d > test.tmpfile
 
   while IFS= read -r dirname; do
-    dirname=$(basename "${dirname}")
-    enc=$(urlencode "-${dirname}-")
-    enc="${enc:1}"
-    enc="${enc%?}"
-    url="${base_url}${enc}"
+    set -f
+    dirname=$(IFS= basename "${dirname}")
+    url=${base_url}$(IFS= urlencode "${dirname}")
+    set +f
     setup "Downloading dir \"${dirname}\" with special char in dirname"
     $github_fetch "${url}"
     test_dir "$test_dir/${dirname}" "$check_dir/special-chars/dirs/${dirname}"
@@ -259,11 +257,10 @@ if [[ 1 == 1 ]]; then #[[ $ignore_api_limit == true ]]; then
   find $check_dir/special-chars/dirs -mindepth 1 -maxdepth 1 -type d > test.tmpfile
 
   while IFS= read -r dirname; do
-    dirname=$(basename "${dirname}")
-    enc=$(urlencode "-${dirname}-")
-    enc="${enc:1}"
-    enc="${enc%?}"
-    url="${base_url}${enc}/testfile"
+    set -f
+    dirname=$(IFS= basename "${dirname}")
+    url=${base_url}$(IFS= urlencode "${dirname}")/testfile
+    set +f
     setup "Downloading file from \"${dirname}\" with special char in dirname"
     $github_fetch "${url}"
     test_file "$test_dir/testfile" "$check_dir/special-chars/dirs/${dirname}/testfile"

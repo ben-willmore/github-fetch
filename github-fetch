@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# disable glob
+set -f
+
 # todo :
 # either handle * in filenames or generate an error when it appears
 # add tests for:
@@ -30,8 +33,8 @@ LANG=C
 # +-------------------------------+
 
 urlencode () {
-  proto=$(echo "$1" | grep :// | sed -e's,^\(.*://\).*,\1,g')
-  url="$(echo ${1/$proto/})"
+  proto=$(IFS= echo "$1" | grep :// | sed -e's,^\(.*://\).*,\1,g')
+  url="$(IFS= echo ${1/$proto/})"
   printf "${proto}"
   local l="${#url}"
   for (( i = 0 ; i < l ; i++ )); do
@@ -57,18 +60,22 @@ github_api () {
     cache_filename=${cache_dir}/$(echo $1 | tr  '/' '-') 
     if [[ -f "${cache_filename}" ]]; then
       echo Found in cache: $1 >&2
-      res=$(cat "${cache_filename}")
+      res=$(IFS= cat "${cache_filename}")
     else
       echo Saving to cache: $1 >&2
-      res=$(wget -qO- $1)
+      if [[ $use_curl == true ]]; then
+        res=$(IFS= curl -sS "${1}")
+      else
+        res=$(IFS= wget -qO- "${1}")
+      fi
       code=$?
       echo $res > "${cache_filename}"
     fi
   else
     if [[ $use_curl == true ]]; then
-      res=$(curl -sS "${1}")
+      res=$(IFS= curl -sS "${1}")
     else
-      res=$(wget -qO- "${1}")
+      res=$(IFS= wget -qO- "${1}")
     fi
    
     code=$?
@@ -80,10 +87,10 @@ github_api () {
 }
 
 get_rate_limit() {
-  res=$(github_api $apiurl/rate_limit false)
-  limit=$(echo $res | jq ".rate.limit")
-  remaining=$(echo $res | jq ".rate.remaining")
-  reset_epoch=$(echo $res | jq ".rate.reset")
+  res=$(IFS= github_api $apiurl/rate_limit false)
+  limit=$(IFS= echo $res | jq ".rate.limit")
+  remaining=$(IFS= echo $res | jq ".rate.remaining")
+  reset_epoch=$(IFS= echo $res | jq ".rate.reset")
   reset_str=$(date -d @$reset_epoch 2>/dev/null)
   if [[ $? != 0 ]]; then
     reset_str=$(date -j -f %s $reset_epoch 2>/dev/null)
@@ -100,7 +107,7 @@ raise_api_error () {
   echo
 
   api_limit=$(get_rate_limit)
-  n_remaining="$(echo $api_limit | cut -d" " -f1)"
+  n_remaining="$(IFS= echo $api_limit | cut -d" " -f1)"
   if [[ $n_remaining == 0 ]]; then
     echo Github API rate limit reached:
     echo $api_limit
@@ -131,7 +138,7 @@ download_file () {
   #   echo "Fetching \"${1}\" as \"${2}\" with perms \"${3}\""
   # fi
 
-  IFS= encoded_url=$(urlencode "${1}")
+  encoded_url=$(IFS= urlencode "${1}")
   if [[ "${verbose}" == true ]]; then
     echo "Encoded URL: ${encoded_url}"
   fi
@@ -159,20 +166,20 @@ dig_to_target () {
     url=$1
     last_url=
 
-    bits=$(echo "${2}" | tr '/' '\n')
+    bits=$(IFS= echo "${2}" | tr '/' '\n')
 
     to_match=
     while IFS= read -r bit; do
       if [[ ${url} != ${last_url} ]]; then
-        res="$(github_api $url)"
+        res="$(IFS= github_api $url)"
         if [[ $? != 0 ]]; then
           raise_api_error "API call failed" $1 >&2
         fi
         last_url="${url}"
       fi
-      bit=$(echo "${bit}" | tr -d '\n')
+      bit=$(IFS= echo "${bit}" | tr -d '\n')
       to_match+="${bit}"
-      url=$(echo $res | jq --arg x "${to_match}" -r '.tree[] | select(.path==$x) | .url' 2>/dev/null)
+      url=$(IFS= echo $res | jq --arg x "${to_match}" -r '.tree[] | select(.path==$x) | .url' 2>/dev/null)
       if [[ -z "${url}" ]]; then
         to_match+='/'
       else
@@ -194,7 +201,7 @@ get_dir () {
     root_slash=
     prefix=
   else
-    base=$(basename "${2}")
+    base=$(IFS= basename "${2}")
     dest_dir="${base}"
     root_slash=/
     prefix="${2}/"
@@ -209,10 +216,10 @@ get_dir () {
     if [[ "${verbose}" == true ]]; then
       echo "Digging from ${1} to ${2}"
     fi
-    url=$(dig_to_target "${1}" "${2}")
+    url=$(IFS= dig_to_target "${1}" "${2}")
   fi
 
-  res="$(github_api $url?recursive=true)"
+  res="$(IFS= github_api $url?recursive=true)"
   if [[ $? != 0 ]]; then
     raise_api_error "API call failed" $url?recursive=true >&2
   fi
@@ -229,9 +236,9 @@ get_dir () {
       echo "== Path: ${filepath}=="
     fi
 
-    perms=$(echo $res | jq --arg x "${filepath}" -r '.tree[] | select(.path==$x) | .mode')
+    perms=$(IFS= echo $res | jq --arg x "${filepath}" -r '.tree[] | select(.path==$x) | .mode')
     dl_path="${filepath#$prefix}"
-    dl_dir=$(dirname "${dl_path}")
+    dl_dir=$(IFS= dirname "${dl_path}")
     if [[ ! -z "${dl_dir}" ]]; then
       mkdir -p "${dl_dir}"
     fi
@@ -244,7 +251,7 @@ get_dir () {
       # symlink
       # https://unix.stackexchange.com/questions/193465/what-file-mode-is-a-symlink
       download_file "${dl_url}" "${dl_path}"
-      target=$(cat "${dl_path}")
+      target=$(IFS= cat "${dl_path}")
       rm -r "${dl_path}"
       ln -s "${target}" "${dl_path}"
     else
@@ -265,29 +272,29 @@ get_file () {
     echo "Base API URL: ${1}"
   fi
 
-  bits=$(echo "${2}" | tr '/' '\n')
-  n_bits=$(echo "${bits}" | wc -l)
+  bits=$(IFS= echo "${2}" | tr '/' '\n')
+  n_bits=$(IFS= echo "${bits}" | wc -l)
  
   if [[ ${n_bits} == 1 ]]; then
     url="${1}"
     base="${2}" 
   else
-    subdir=$(dirname "${2}")
+    subdir=$(IFS= dirname "${2}")
     if [[ "${verbose}" == true ]]; then
       echo "Digging from ${1} to ${2}"
     fi
 
-    url=$(dig_to_target "${1}" "${subdir}")
-    base=$(basename "${2}")
+    url=$(IFS= dig_to_target "${1}" "${subdir}")
+    base=$(IFS= basename "${2}")
   fi
 
-  res="$(github_api $url)"
+  res="$(IFS= github_api $url)"
   if [[ $? != 0 ]]; then
     raise_api_error "API call failed" $url >&2
   fi
 
-  filepath=$(echo $res | jq --arg x "${base}" -r '.tree[] | select(.type=="blob" and .path==$x) | .path' 2>/dev/null)
-  perms=$(echo $res | jq --arg x "${base}" -r '.tree[] | select(.type=="blob" and .path==$x) | .mode' 2>/dev/null)
+  filepath=$(IFS= echo $res | jq --arg x "${base}" -r '.tree[] | select(.type=="blob" and .path==$x) | .path' 2>/dev/null)
+  perms=$(IFS= echo $res | jq --arg x "${base}" -r '.tree[] | select(.type=="blob" and .path==$x) | .mode' 2>/dev/null)
 
   url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${2}"
   if [[ -e "${filepath}" ]]; then
@@ -434,17 +441,17 @@ fi
 #input_url=$(urldecode "${input_url}")
 #echo ii--$input_url--ii
 
-proto="$(echo $input_url | grep :// | sed -e's,^\(.*://\).*,\1,g')"
-url="$(echo ${input_url/$proto/})"
+proto="$(IFS= echo $input_url | grep :// | sed -e's,^\(.*://\).*,\1,g')"
+url="$(IFS= echo ${input_url/$proto/})"
 
-host="$(echo $url | cut -d/ -f1)"
-url="$(echo ${url/$host\//})"
+host="$(IFS= echo $url | cut -d/ -f1)"
+url="$(IFS= echo ${url/$host\//})"
 
-user="$(echo $url | cut -d/ -f1)"
-url="$(echo ${url/$user\//})"
+user="$(IFS= echo $url | cut -d/ -f1)"
+url="$(IFS= echo ${url/$user\//})"
 
-repo="$(echo $url | cut -d/ -f1)"
-url="$(echo ${url/$repo\//})"
+repo="$(IFS= echo $url | cut -d/ -f1)"
+url="$(IFS= echo ${url/$repo\//})"
 
 if [[ ${url} == ${repo} ]]; then
   # there is no tree|blob in the URL
@@ -454,10 +461,10 @@ if [[ ${url} == ${repo} ]]; then
   root=
   echo "Fetching ${user}:${repo} (whole repo, default branch)"
 else
-  type="$(echo ${url} | cut -d/ -f1)"
-  url="$(echo ${url/$type\//})"
+  type="$(IFS= echo ${url} | cut -d/ -f1)"
+  url="$(IFS= echo ${url/$type\//})"
 
-  ref="$(echo ${url} | cut -d/ -f1)"
+  ref="$(IFS= echo ${url} | cut -d/ -f1)"
 
   if [[ ${url} == ${ref} ]]; then
     # got whole URL already, get whole repo
@@ -494,12 +501,12 @@ fi
 
 if [[ -z ${ref} ]]; then
   api_rq_url="${apiurl}/repos/${user}/${repo}"
-  res="$(github_api $api_rq_url)"
+  res="$(IFS= github_api $api_rq_url)"
   if [[ $? != 0 ]]; then
     raise_api_error "API call failed" $api_rq_url >&2
   fi
 
-  ref="$(echo $res | jq -r '.default_branch' 2>/dev/null)"
+  ref="$(IFS= echo $res | jq -r '.default_branch' 2>/dev/null)"
 
   if [[ $? != 0 ]]; then
     raise_api_error "Could not parse API response" "$api_rq_url" >&2
