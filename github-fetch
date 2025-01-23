@@ -224,19 +224,17 @@ get_dir () {
     raise_api_error "API call failed" $url?recursive=true >&2
   fi
 
+  filepaths=$(echo $res | jq -r '.tree[] | select(.type=="blob") | .path')
   if [[ $? != 0 ]]; then
     raise_api_error "Could not parse API response" "${1}"
   fi
 
-  echo $res | jq -r '.tree[] | select(.type=="blob") | .path' >> github-fetch-tmp-catalog.txt
-
-  while IFS= read -r filepath; do
-
+  echo "$filepaths" | while IFS= read -r filepath; do
     if [[ $verbose == true ]]; then
       echo "== Path: ${filepath}=="
     fi
 
-    perms=$(IFS= echo $res | jq --arg x "${filepath}" -r '.tree[] | select(.path==$x) | .mode')
+    perms=$(echo $res | jq --arg x "${filepath}" -r '.tree[] | select(.path==$x) | .mode')
     dl_path="${filepath#$prefix}"
     dl_dir=$(IFS= dirname "${dl_path}")
     if [[ ! -z "${dl_dir}" ]]; then
@@ -259,9 +257,7 @@ get_dir () {
       download_file "${dl_url}" "${dl_path}" "${perms}"
     fi
 
-  done < github-fetch-tmp-catalog.txt
-
-  rm github-fetch-tmp-catalog.txt
+  done
 
   cd ..
 }
