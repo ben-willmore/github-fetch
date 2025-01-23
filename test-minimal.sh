@@ -105,8 +105,8 @@ initial_setup
 
 setup "Downloading subdir to current directory"
 git_checkout main
-$github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test
-test_dir $test_dir/test $check_dir
+$github_fetch https://github.com/ben-willmore/github-fetch/tree/main/test/special-chars-2
+test_dir $test_dir/special-chars-2 $check_dir/special-chars-2
 #teardown
 
 #final_cleanup

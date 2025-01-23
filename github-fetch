@@ -69,7 +69,7 @@ github_api () {
         res=$(IFS= wget -qO- "${1}")
       fi
       code=$?
-      echo $res > "${cache_filename}"
+      echo "$res" > "${cache_filename}"
     fi
   else
     if [[ $use_curl == true ]]; then
@@ -82,15 +82,15 @@ github_api () {
   fi
 
   n_api_calls=$((n_api_calls+1))
-  echo $res
+  echo "$res"
   exit $code
 }
 
 get_rate_limit() {
   res=$(IFS= github_api $apiurl/rate_limit false)
-  limit=$(IFS= echo $res | jq ".rate.limit")
-  remaining=$(IFS= echo $res | jq ".rate.remaining")
-  reset_epoch=$(IFS= echo $res | jq ".rate.reset")
+  limit=$(IFS= echo "$res" | jq ".rate.limit")
+  remaining=$(IFS= echo "$res" | jq ".rate.remaining")
+  reset_epoch=$(IFS= echo "$res" | jq ".rate.reset")
   reset_str=$(date -d @$reset_epoch 2>/dev/null)
   if [[ $? != 0 ]]; then
     reset_str=$(date -j -f %s $reset_epoch 2>/dev/null)
@@ -179,7 +179,7 @@ dig_to_target () {
       fi
       bit=$(IFS= echo "${bit}" | tr -d '\n')
       to_match+="${bit}"
-      url=$(IFS= echo $res | jq --arg x "${to_match}" -r '.tree[] | select(.path==$x) | .url' 2>/dev/null)
+      url=$(IFS= echo "$res" | jq --arg x "${to_match}" -r '.tree[] | select(.path==$x) | .url' 2>/dev/null)
       if [[ -z "${url}" ]]; then
         to_match+='/'
       else
@@ -224,7 +224,7 @@ get_dir () {
     raise_api_error "API call failed" $url?recursive=true >&2
   fi
 
-  filepaths=$(echo $res | jq -r '.tree[] | select(.type=="blob") | .path')
+  filepaths=$( echo "$res" | jq -r '.tree[] | select(.type=="blob") | .path')
   if [[ $? != 0 ]]; then
     raise_api_error "Could not parse API response" "${1}"
   fi
@@ -234,11 +234,15 @@ get_dir () {
       echo "== Path: ${filepath}=="
     fi
 
-    perms=$(echo $res | jq --arg x "${filepath}" -r '.tree[] | select(.path==$x) | .mode')
+    perms=$(echo "$res" | jq --arg x "${filepath}" -r '.tree[] | select(.path==$x) | .mode')
     dl_path="${filepath#$prefix}"
-    dl_dir=$(IFS= dirname "${dl_path}")
+    if [[ "${dl_path}" =~ / ]];then
+      dl_dir="${dl_path%/*}"
+    else
+      dl_dir=
+    fi
     if [[ ! -z "${dl_dir}" ]]; then
-      mkdir -p "${dl_dir}"
+      mkdir -p ./"${dl_dir}"
     fi
     dl_url="https://raw.githubusercontent.com/${user}/${repo}/${ref}${root_slash}${root}/${filepath}"
 
@@ -289,8 +293,8 @@ get_file () {
     raise_api_error "API call failed" $url >&2
   fi
 
-  filepath=$(IFS= echo $res | jq --arg x "${base}" -r '.tree[] | select(.type=="blob" and .path==$x) | .path' 2>/dev/null)
-  perms=$(IFS= echo $res | jq --arg x "${base}" -r '.tree[] | select(.type=="blob" and .path==$x) | .mode' 2>/dev/null)
+  filepath=$(IFS= echo "$res" | jq --arg x "${base}" -r '.tree[] | select(.type=="blob" and .path==$x) | .path' 2>/dev/null)
+  perms=$(IFS= echo "$res" | jq --arg x "${base}" -r '.tree[] | select(.type=="blob" and .path==$x) | .mode' 2>/dev/null)
 
   url="https://raw.githubusercontent.com/${user}/${repo}/${ref}/${2}"
   if [[ -e "${filepath}" ]]; then
@@ -502,7 +506,7 @@ if [[ -z ${ref} ]]; then
     raise_api_error "API call failed" $api_rq_url >&2
   fi
 
-  ref="$(IFS= echo $res | jq -r '.default_branch' 2>/dev/null)"
+  ref="$(IFS= echo "$res" | jq -r '.default_branch' 2>/dev/null)"
 
   if [[ $? != 0 ]]; then
     raise_api_error "Could not parse API response" "$api_rq_url" >&2
