@@ -29,3 +29,14 @@ for c in all:
   makedirs(subdir)
   with open(subdir + "/testfile", 'w') as file:
     file.write('dir-'+c)
+
+makedirs('./special-chars-2')
+
+for c in all:
+  if c != '.':
+    with open('./special-chars-2/'+c, 'w') as file:
+      file.write(c)
+    with open('./special-chars-2/'+c+c, 'w') as file:
+      file.write(c+c)
+  with open('./special-chars-2/'+c+c+c, 'w') as file:
+    file.write(c+c+c)
